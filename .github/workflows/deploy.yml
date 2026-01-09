@@ -1,0 +1,68 @@
+name: Deploy to production
+
+on:
+ workflow_run:
+  workflows: ['CI (Bun)']
+  types:
+   - completed
+  branches:
+   - main
+
+jobs:
+ deploy:
+  name: Deploy to production
+  runs-on: self-hosted
+  if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+  steps:
+   - name: Checkout
+     uses: actions/checkout@v6
+
+   - name: Install Bun
+     uses: oven-sh/setup-bun@v2
+     with:
+      bun-version: latest
+
+   - name: Setup dependencies
+     run: bun install
+
+   - name: Type check and generate SvelteKit config
+     run: bun run check && bunx svelte-kit sync
+
+   - name: Lint code
+     env:
+      NODE_OPTIONS: '--max-old-space-size=16384'
+     run: bun run lint
+
+   - name: Build project
+     run: bun run build
+
+   - name: Paste files to server
+     run: |
+      cd ~/LeCercle
+      # Supprimer tout SAUF .env, data et .svelte-kit
+      # On préserve 'data' car il contient la DB et les fichiers permanents
+      find . -mindepth 1 -maxdepth 1 -not -name '.env' -not -name 'data' -not -name '.svelte-kit' -exec rm -rf {} +
+
+      # Copier les nouveaux fichiers depuis le runner
+      # Attention: Le chemin source peut varier selon le nom du projet, ici on suppose 'LeCercle'
+      cp -r ~/actions-runner/_work/LeCercle/LeCercle/* .
+
+   - name: Initialize database if needed
+     run: |
+       cd ~/LeCercle
+       if [ ! -f "data/le_cercle.db" ]; then
+         echo "Base de données non trouvée, initialisation..."
+         bun run db:init
+       else
+         echo "Base de données existante trouvée, pas d'initialisation"
+       fi
+
+   - name: Restart server
+     run: |
+      cd ~/LeCercle
+      pm2 delete lecercle || true
+      pm2 start /home/mitv/.bun/bin/bun \
+        --name lecercle \
+        --cwd /home/mitv/LeCercle \
+        -- run /home/mitv/LeCercle/build/index.js
+      pm2 save

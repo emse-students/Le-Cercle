@@ -1,0 +1,41 @@
+{
+	"/": [],
+	"/admin": [],
+	"/api/boissons": [
+		"src/routes/api/boissons/+server.ts"
+	],
+	"/api/consommables": [
+		"src/routes/api/consommables/+server.ts"
+	],
+	"/api/perms": [
+		"src/routes/api/perms/+server.ts"
+	],
+	"/api/perms/active": [
+		"src/routes/api/perms/active/+server.ts"
+	],
+	"/api/recharge": [
+		"src/routes/api/recharge/+server.ts"
+	],
+	"/api/status": [
+		"src/routes/api/status/+server.ts"
+	],
+	"/api/transactions": [
+		"src/routes/api/transactions/+server.ts"
+	],
+	"/api/users": [
+		"src/routes/api/users/+server.ts"
+	],
+	"/dev/login-as": [
+		"src/routes/dev/login-as/+server.ts"
+	],
+	"/dev/logout": [
+		"src/routes/dev/logout/+server.ts"
+	],
+	"/dev/recharge": [
+		"src/routes/dev/recharge/+server.ts"
+	],
+	"/open-perm": [],
+	"/profile": [],
+	"/recharge": [],
+	"/serve": []
+}

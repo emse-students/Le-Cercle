@@ -1,0 +1,78 @@
+name: CI (Bun)
+
+on:
+ push:
+  branches:
+   - main
+ pull_request:
+  branches:
+   - main
+
+jobs:
+ build:
+  name: Build / Test / Lint / Package
+  runs-on: ubuntu-latest
+  strategy:
+   matrix:
+    runtime: [bun, npm]
+  steps:
+   - name: Checkout
+     uses: actions/checkout@v6
+
+   - name: Setup Bun
+     if: matrix.runtime == 'bun'
+     uses: oven-sh/setup-bun@v2
+     with:
+      bun-version: latest
+
+   - name: Setup Node.js
+     if: matrix.runtime == 'npm'
+     uses: actions/setup-node@v6
+     with:
+      node-version: '24.x'
+
+   - name: Install dependencies (Bun)
+     if: matrix.runtime == 'bun'
+     run: bun install
+
+   - name: Install dependencies (npm)
+     if: matrix.runtime == 'npm'
+     run: npm install
+
+   - name: Type check (Bun)
+     if: matrix.runtime == 'bun'
+     run: bun run check
+
+   - name: Type check (npm)
+     if: matrix.runtime == 'npm'
+     run: npm run check
+
+   - name: Generate SvelteKit config (Bun)
+     if: matrix.runtime == 'bun'
+     run: bunx svelte-kit sync
+
+   - name: Generate SvelteKit config (npm)
+     if: matrix.runtime == 'npm'
+     run: npx svelte-kit sync
+
+   - name: Lint code (Bun)
+     if: matrix.runtime == 'bun'
+     env:
+      NODE_OPTIONS: '--max-old-space-size=16384'
+     run: bun run lint
+
+   - name: Lint code (npm)
+     if: matrix.runtime == 'npm'
+     env:
+      NODE_OPTIONS: '--max-old-space-size=16384'
+     run: npm run lint
+
+   - name: Build (Bun)
+     if: matrix.runtime == 'bun'
+     run: bun run build
+
+   - name: Build (npm)
+     if: matrix.runtime == 'npm'
+     env:
+      ADAPTER: node
+     run: npm run build
