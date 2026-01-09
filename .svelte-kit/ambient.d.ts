@@ -48,6 +48,7 @@ declare module '$env/static/private' {
 	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const GENARTS_LICENSE: string;
 	export const GIT_ASKPASS: string;
+	export const GIT_PAGER: string;
 	export const GOPATH: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
@@ -56,7 +57,6 @@ declare module '$env/static/private' {
 	export const LOCALAPPDATA: string;
 	export const LOGONSERVER: string;
 	export const NODE: string;
-	export const NODE_ENV: string;
 	export const npm_command: string;
 	export const npm_config_local_prefix: string;
 	export const npm_config_user_agent: string;
@@ -155,6 +155,7 @@ declare module '$env/dynamic/private' {
 		FPS_BROWSER_USER_PROFILE_STRING: string;
 		GENARTS_LICENSE: string;
 		GIT_ASKPASS: string;
+		GIT_PAGER: string;
 		GOPATH: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
@@ -163,7 +164,6 @@ declare module '$env/dynamic/private' {
 		LOCALAPPDATA: string;
 		LOGONSERVER: string;
 		NODE: string;
-		NODE_ENV: string;
 		npm_command: string;
 		npm_config_local_prefix: string;
 		npm_config_user_agent: string;

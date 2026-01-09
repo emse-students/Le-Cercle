@@ -54,6 +54,6 @@ declare module "$app/types" {
 		};
 		Pathname(): "/" | "/admin" | "/admin/" | "/api" | "/api/" | "/api/boissons" | "/api/boissons/" | "/api/consommables" | "/api/consommables/" | "/api/perms" | "/api/perms/" | "/api/perms/active" | "/api/perms/active/" | "/api/recharge" | "/api/recharge/" | "/api/status" | "/api/status/" | "/api/transactions" | "/api/transactions/" | "/api/users" | "/api/users/" | "/dev" | "/dev/" | "/dev/login-as" | "/dev/login-as/" | "/dev/logout" | "/dev/logout/" | "/dev/recharge" | "/dev/recharge/" | "/open-perm" | "/open-perm/" | "/profile" | "/profile/" | "/recharge" | "/recharge/" | "/serve" | "/serve/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): string & {};
+		Asset(): "/logo.png" | string & {};
 	}
 }

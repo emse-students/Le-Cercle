@@ -2,6 +2,8 @@
    import { onMount } from 'svelte';
    import Icon from '$lib/components/Icon.svelte';
    import UserSearch from '$lib/components/UserSearch.svelte';
+   import EditUserModal from '$lib/components/EditUserModal.svelte';
+   import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 
    let activeTab = $state('users');
    let users = $state<any[]>([]);
@@ -23,11 +25,24 @@
    let newUserPrenom = $state('');
    let newUserNom = $state('');
    let newUserPromo = $state(new Date().getFullYear());
-   let newUserDroit = $state('user');
+   let newUserRole = $state('user');
+   let newUserStatut = $state('non_cotisant');
    
    // Computed login/mail
    let newUserLogin = $derived(newUserPrenom && newUserNom ? `${newUserPrenom.toLowerCase()}.${newUserNom.toLowerCase()}` : '');
    let newUserMail = $derived(newUserLogin ? `${newUserLogin}@etu.emse.fr` : '');
+   
+   // Edit user modal
+   let editingUser = $state<any>(null);
+   let showEditModal = $state(false);
+   
+   // Delete user confirmation
+   let deletingUser = $state<any>(null);
+   let showDeleteConfirm = $state(false);
+   
+   // Config cotisations
+   let cotisationSansAlcool = $state(10.0);
+   let cotisationAvecAlcool = $state(20.0);
    
    onMount(async () => {
        await loadUsers();
@@ -180,9 +195,9 @@
                    login: newUserLogin,
                    prenom: newUserPrenom,
                    nom: newUserNom,
-                   type: newUserType,
                    promo: newUserPromo,
-                   droit: newUserDroit
+                   role: newUserRole,
+                   statut_cotisation: newUserStatut
                })
            });
            
@@ -191,7 +206,8 @@
                newUserPrenom = '';
                newUserNom = '';
                newUserPromo = new Date().getFullYear();
-               newUserDroit = 'user';
+               newUserRole = 'user';
+               newUserStatut = 'non_cotisant';
                await loadUsers();
            } else {
                const error = await res.json();
@@ -201,21 +217,48 @@
            message = { type: 'error', text: 'Erreur réseau' };
        } finally {
            loading = false;
-       }
+       }user;
+       showEditModal = true;
    }
    
-   async function updateUserDroit(userId: number, droit: string) {
+   function closeEditModal() {
+       editingUser = null;
+       showEditModal = false;
+   }
+   
+   async function handleEditSuccess() {
+       message = { type: 'success', text: 'Utilisateur modifié avec succès' };
+       await loadUsers();
+   }
+   
+   function openDeleteConfirm(user: any) {
+       deletingUser = user;
+       showDeleteConfirm = true;
+   }
+   
+   function closeDeleteConfirm() {
+       deletingUser = null;
+       showDeleteConfirm = false;
+   }
+   
+   async function handleDeleteConfirm() {
+       if (!deletingUser) return;
+       
        loading = true;
+       message = { type: '', text: '' };
        
        try {
-           const res = await fetch('/api/users', {
-               method: 'PATCH',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ userId, droit })
+           const res = await fetch(`/api/users?id=${deletingUser.id}`, {
+               method: 'DELETE'
            });
            
            if (res.ok) {
-               message = { type: 'success', text: 'Droits modifiés' };
+               message = { type: 'success', text: 'Utilisateur supprimé' };
+               await loadUsers();
+               closeDeleteConfirm
+           
+           if (res.ok) {
+               message = { type: 'success', text: 'Utilisateur supprimé' };
                await loadUsers();
            } else {
                const error = await res.json();
@@ -282,10 +325,18 @@
                            <input id="new-promo" type="number" bind:value={newUserPromo} min="2020" max="2030" class="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg" />
                        </div>
                        <div>
-                           <label for="new-droit" class="block text-sm font-medium text-text-secondary mb-2">Rôle</label>
-                           <select id="new-droit" bind:value={newUserDroit} class="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg">
-                               <option value="user">User</option>
+                           <label for="new-role" class="block text-sm font-medium text-text-secondary mb-2">Rôle</label>
+                           <select id="new-role" bind:value={newUserRole} class="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg">
+                               <option value="user">Utilisateur</option>
                                <option value="cercleux">Cercleux</option>
+                           </select>
+                       </div>
+                       <div class="md:col-span-2">
+                           <label for="new-statut" class="block text-sm font-medium text-text-secondary mb-2">Statut de cotisation</label>
+                           <select id="new-statut" bind:value={newUserStatut} class="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg">
+                               <option value="non_cotisant">Non cotisant</option>
+                               <option value="cotisant_sans_alcool">Cotisant sans alcool ({cotisationSansAlcool.toFixed(2)}€)</option>
+                               <option value="cotisant_avec_alcool">Cotisant avec alcool ({cotisationAvecAlcool.toFixed(2)}€)</option>
                            </select>
                        </div>
                    </div>
@@ -320,6 +371,7 @@
                                        <th class="pb-2 text-sm font-semibold text-text-secondary">Promo</th>
                                        <th class="pb-2 text-sm font-semibold text-text-secondary">Solde</th>
                                        <th class="pb-2 text-sm font-semibold text-text-secondary">Rôle</th>
+                                       <th class="pb-2 text-sm font-semibold text-text-secondary">Statut</th>
                                        <th class="pb-2 text-sm font-semibold text-text-secondary">Actions</th>
                                    </tr>
                                </thead>
@@ -332,22 +384,38 @@
                                            <td class="py-3 text-text-secondary">{user.promo}</td>
                                            <td class="py-3 {user.solde < 0 ? 'text-red-500' : 'text-green-500'} font-mono">{user.solde.toFixed(2)} €</td>
                                            <td class="py-3">
-                                               <select 
-                                                   value={user.role} 
-                                                   aria-label="Modifier le rôle de {user.login}"
-                                                   onchange={(e) => updateUserDroit(user.id, e.currentTarget.value)}
-                                                   class="px-2 py-1 bg-bg-primary border border-border rounded text-sm"
-                                               >
-                                                   <option value="user">User</option>
-                                                   <option value="cercleux">Cercleux</option>
-                                               </select>
+                                               <span class="px-2 py-1 rounded text-xs font-medium {user.role === 'cercleux' ? 'bg-brand-red/20 text-brand-red' : 'bg-bg-tertiary text-text-secondary'}">
+                                                   {user.role === 'cercleux' ? 'Cercleux' : 'Utilisateur'}
+                                               </span>
                                            </td>
                                            <td class="py-3">
-                                               <a href="/dev/login-as?u={user.login}" target="_blank" class="text-brand-red hover:underline text-sm">Se connecter</a>
+                                               <span class="px-2 py-1 rounded text-xs font-medium {
+                                                   user.statut_cotisation === 'cotisant_avec_alcool' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
+                                                   user.statut_cotisation === 'cotisant_sans_alcool' ? 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400' :
+                                                   'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                                               }">
+                                                   {user.statut_cotisation === 'cotisant_avec_alcool' ? 'Cotisant +alcool' :
+                                                    user.statut_cotisation === 'cotisant_sans_alcool' ? 'Cotisant -alcool' :
+                                                    'Non cotisant'}
+                                               </span>
+                                           </td>
+                                           <td class="py-3 space-x-2">
+                                               <button
+                                                   onclick={() => openEditModal(user)}
+                                                   class="text-brand-red hover:underline text-sm"
+                                               >
+                                                   Modifier
+                                               </button>
+                                               <button
+                                                   onclick={() => deleteUser(user.id, user.login)}
+                                                   class="text-red-600 hover:underline text-sm"
+                                               >
+                                                   Supprimer
+                                               </button>
                                            </td>
                                        </tr>
                                    {/each}
-                               </tbody>
+                               </tbody>openDeleteConfirm(user
                            </table>
                        </div>
                    {/if}
@@ -499,3 +567,30 @@
        </div>
    </div>
 </div>
+
+<!-- Modal de modification utilisateur -->
+{#if showEditModal && editingUser}
+   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={closeEditModal}>
+       <div class="bg-bg-secondary rounded-lg shadow-xl max-w-2xl w-full p-6" onclick={(e) => e.stopPropagation()}>
+           <div class="flex justify-between items-center mb-6">
+               <h3 class="text-xl font-bold text-text-primary">Modifier l'utilisateur</h3>
+               <button onclick={closeEditModal} class="text-text-muted hover:text-text-primary">
+                   <Icon name="X" size={24} />
+          s -->
+<EditUserModal
+    bind:show={showEditModal}
+    user={editingUser}
+    onClose={closeEditModal}
+    onSuccess={handleEditSuccess}
+/>
+
+<ConfirmModal
+    bind:show={showDeleteConfirm}
+    title="Supprimer l'utilisateur"
+    message="Êtes-vous sûr de vouloir supprimer l'utilisateur {deletingUser?.login} ? Cette action est irréversible."
+    confirmText="Supprimer"
+    cancelText="Annuler"
+    type="error"
+    onConfirm={handleDeleteConfirm}
+    onCancel={closeDeleteConfirm}
+/>

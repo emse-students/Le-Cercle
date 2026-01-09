@@ -1,12 +1,16 @@
 // Types basés sur le schéma de base de données
 
 export interface User {
-    id: number;
-    login: string;
+	id: number;
+	login: string;
 	mail: string;
-    solde: number;
-    role: 'user' | 'cercleux';
-    created_at?: string;
+	prenom: string;
+	nom: string;
+	promo: number;
+	solde: number;
+	role: 'user' | 'cercleux';
+	statut_cotisation: 'non_cotisant' | 'cotisant_sans_alcool' | 'cotisant_avec_alcool';
+	created_at?: string;
 }
 
 export interface Contenu {
