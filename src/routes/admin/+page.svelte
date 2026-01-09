@@ -217,7 +217,11 @@
            message = { type: 'error', text: 'Erreur réseau' };
        } finally {
            loading = false;
-       }user;
+       }
+   }
+   
+   function openEditModal(user: any) {
+       editingUser = user;
        showEditModal = true;
    }
    
@@ -255,11 +259,7 @@
            if (res.ok) {
                message = { type: 'success', text: 'Utilisateur supprimé' };
                await loadUsers();
-               closeDeleteConfirm
-           
-           if (res.ok) {
-               message = { type: 'success', text: 'Utilisateur supprimé' };
-               await loadUsers();
+               closeDeleteConfirm();
            } else {
                const error = await res.json();
                message = { type: 'error', text: error.error };
@@ -407,7 +407,7 @@
                                                    Modifier
                                                </button>
                                                <button
-                                                   onclick={() => deleteUser(user.id, user.login)}
+                                                   onclick={() => openDeleteConfirm(user)}
                                                    class="text-red-600 hover:underline text-sm"
                                                >
                                                    Supprimer
@@ -415,7 +415,7 @@
                                            </td>
                                        </tr>
                                    {/each}
-                               </tbody>openDeleteConfirm(user
+                               </tbody>
                            </table>
                        </div>
                    {/if}
@@ -568,15 +568,7 @@
    </div>
 </div>
 
-<!-- Modal de modification utilisateur -->
-{#if showEditModal && editingUser}
-   <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={closeEditModal}>
-       <div class="bg-bg-secondary rounded-lg shadow-xl max-w-2xl w-full p-6" onclick={(e) => e.stopPropagation()}>
-           <div class="flex justify-between items-center mb-6">
-               <h3 class="text-xl font-bold text-text-primary">Modifier l'utilisateur</h3>
-               <button onclick={closeEditModal} class="text-text-muted hover:text-text-primary">
-                   <Icon name="X" size={24} />
-          s -->
+<!-- Modals -->
 <EditUserModal
     bind:show={showEditModal}
     user={editingUser}

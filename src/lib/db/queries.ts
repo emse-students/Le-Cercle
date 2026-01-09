@@ -57,21 +57,21 @@ export function createUser(user: Omit<User, 'id' | 'created_at'>) {
 		user.statut_cotisation || 'non_cotisant'
 	);
 }
-R = Recharge, id_perm NULL)
+
+export function rechargeBalance(userId: number, amount: number) {
+	const user = getUserById(userId);
+	if (!user) {
+		throw new Error('User not found');
+	}
+	const newBalance = user.solde + amount;
+
+	// Transaction de recharge (Type R = Recharge, id_perm NULL)
 	const stmt = db.prepare(`
         INSERT INTO transactions (id_user, id_debiteur, id_perm, type, id_item, date, nb, prix)
         VALUES (?, ?, NULL, 'R', NULL, ?, 1, ?)
     `);
 
-	stmt.run(userId, userId, Math.floor(Date.now() / 1000), amount);rs perm, ou une perm spéciale admin
-	// Ici on met 0, attention aux contraintes FK sur transactions(id_perm).
-	// Si FK, il faut une perm ID 0 ou NULL.
-	// Le schema dit: id_perm INTEGER NOT NULL REFERENCES perms(id).
-	// Il faut donc une perm 'Hors Perm' ou similaire existante, ou rendre id_perm nullable.
-	// Pour l'instant, assumons qu'on passe un id_perm valide ou 0 si autorisé (sqlite enforce FK by default only if enabled).
-	// Le code existant ne semble pas gérer les permissions 'Hors Perm'.
-	// Nous allons créer une transaction simple sans perm si possible, ou update juste le solde.
-	// Le user demande juste "recharger le compte".
+	stmt.run(userId, userId, Math.floor(Date.now() / 1000), amount);
 
 	updateUserSolde(userId, newBalance);
 	return newBalance;

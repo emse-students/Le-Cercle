@@ -20,9 +20,8 @@ CREATE TABLE IF NOT EXISTS config_cotisations (
 );
 
 -- Insertion des valeurs par défaut
-INSERT OR IGNORE INTO config_cotisations (id, type, montant) VALUES 
-    (1, 'sans_alcool', 10.0),
-    (2, 'avec_alcool', 20.0);
+INSERT INTO config_cotisations (id, type, montant) VALUES (1, 'sans_alcool', 10.0);
+INSERT INTO config_cotisations (id, type, montant) VALUES (2, 'avec_alcool', 20.0);
 
 -- Contenus (boissons - nom, type, degré)
 CREATE TABLE IF NOT EXISTS contenus (
@@ -153,4 +152,4 @@ CREATE TABLE IF NOT EXISTS perm_barmans (
 );
 
 CREATE INDEX IF NOT EXISTS idx_perm_barmans_user ON perm_barmans(id_user);
-CREATE INDEX IF NOT EXISTS idx_perm_barmans_perm ON perm_barmans(id_nom_perm
+CREATE INDEX IF NOT EXISTS idx_perm_barmans_perm ON perm_barmans(id_perm);

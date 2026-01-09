@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireCercleux } from '$lib/auth';
 import { searchUsers, createUser, updateUserRole, updateUserSolde, updateUserStatutCotisation, deleteUser, getAllUsers, getUserById } from '$lib/db/queries';
 import type { User } from '$lib/types';
-import { db } from '$lib/db';
+import db from '$lib/db';
 
 // GET /api/users?q=search (retourne tous les users si pas de query)
 export const GET: RequestHandler = (event) => {
@@ -58,7 +58,8 @@ interface UpdateUserDTO {
 	role?: string;
 	solde?: number;
 }
- role or statut
+
+// PATCH /api/users - Update user role or statut
 export const PATCH: RequestHandler = async (event) => {
 	requireCercleux(event);
 
@@ -142,8 +143,7 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	try {
-		deleteUser(Number(userId));updateUserSolde(id, solde);
-		}
+		deleteUser(Number(userId));
 		return json({ success: true });
 	} catch (err: unknown) {
 		return json({ error: (err as Error).message }, { status: 500 });
