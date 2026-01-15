@@ -61,7 +61,7 @@
 		"better-sqlite3": "^12.5.0",
 		"dotenv": "^17.2.3",
 		"lucide-svelte": "^0.562.0",
-		"svelte-adapter-bun": "^0.5.2",
+		"svelte-adapter-bun": "^1.0.1",
 		"typescript-eslint": "^8.52.0"
 	}
 }
