@@ -38,6 +38,11 @@ export function updateUserStatutCotisation(userId: number, statut: string) {
 }
 
 export function deleteUser(userId: number) {
+	// Supprimer les dépendances pour éviter les erreurs de clé étrangère
+	db.prepare('DELETE FROM perm_barmans WHERE id_user = ?').run(userId);
+	db.prepare('DELETE FROM transactions WHERE id_user = ? OR id_debiteur = ?').run(userId, userId);
+	db.prepare('DELETE FROM year_stats WHERE id_user = ?').run(userId);
+
 	return db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 }
 
@@ -101,13 +106,35 @@ export function getUserTransactions(userId: number, limit = 50): Transaction[] {
 	return db.prepare(`
         SELECT 
             t.*,
-            u.prenom as user_prenom, u.nom as user_nom
+            u.prenom as user_prenom, u.nom as user_nom,
+            -- Boisson Info
+            co.nom as boisson_nom,
+            ct.nom as contenant_nom,
+            -- Consommable info
+            con.nom as consommable_nom
         FROM transactions t
         JOIN users u ON t.id_user = u.id
+        LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
+        LEFT JOIN contenus co ON b.id_contenu = co.id
+        LEFT JOIN contenants ct ON b.id_contenant = ct.id
+        LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
         WHERE t.id_user = ?
         ORDER BY t.date DESC
         LIMIT ?
     `).all(userId, limit) as Transaction[];
+}
+
+export function getTransactionDetails(t: any) {
+	if (t.type === 'R') {
+		return 'Rechargement';
+	}
+	if (t.type === 'B') {
+		return `${t.boisson_nom || '?'} ${t.contenant_nom || '?'}`;
+	}
+	if (t.type === 'C') {
+		return t.consommable_nom || '?';
+	}
+	return 'Transaction';
 }
 
 export function getPermTransactions(permId: number): Transaction[] {
@@ -164,83 +191,6 @@ export function getTransactionsByDateRange(startDate: number, endDate: number, l
 
 export function deleteTransaction(id: number) {
 	return db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
-}
-
-// ========== BOISSONS ==========
-
-export function createBoisson(boisson: Omit<Boisson, 'id' | 'contenu' | 'contenant'>) {
-	const stmt = db.prepare(`
-        INSERT INTO boissons (id_contenu, id_contenant, prix_achat, consigne, prix_vente, nb_plein, nb_vide)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-	return stmt.run(
-		boisson.id_contenu,
-		boisson.id_contenant,
-		boisson.prix_achat,
-		boisson.consigne,
-		boisson.prix_vente,
-		boisson.nb_plein || 0,
-		boisson.nb_vide || 0
-	);
-}
-
-export function updateBoisson(id: number, boisson: Partial<Boisson>) {
-	const fields: string[] = [];
-	const values: (string | number)[] = [];
-
-	if (boisson.id_contenu !== undefined) {
-		fields.push('id_contenu = ?'); values.push(boisson.id_contenu);
-	}
-	if (boisson.id_contenant !== undefined) {
-		fields.push('id_contenant = ?'); values.push(boisson.id_contenant);
-	}
-	if (boisson.prix_achat !== undefined) {
-		fields.push('prix_achat = ?'); values.push(boisson.prix_achat);
-	}
-	if (boisson.consigne !== undefined) {
-		fields.push('consigne = ?'); values.push(boisson.consigne);
-	}
-	if (boisson.prix_vente !== undefined) {
-		fields.push('prix_vente = ?'); values.push(boisson.prix_vente);
-	}
-	if (boisson.nb_plein !== undefined) {
-		fields.push('nb_plein = ?'); values.push(boisson.nb_plein);
-	}
-	if (boisson.nb_vide !== undefined) {
-		fields.push('nb_vide = ?'); values.push(boisson.nb_vide);
-	}
-
-	if (fields.length === 0) {
-		return;
-	}
-
-	values.push(id);
-	return db.prepare(`UPDATE boissons SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-}
-
-export function getAllBoissons(): Boisson[] {
-	return db.prepare(`
-        SELECT 
-            b.*,
-            ct.nom as contenu_nom, ct.type as contenu_type, ct.degre as contenu_degre,
-            cn.nom as contenant_nom, cn.capacite as contenant_capacite, cn.type as contenant_type
-        FROM boissons b
-        LEFT JOIN contenus ct ON b.id_contenu = ct.id
-        LEFT JOIN contenants cn ON b.id_contenant = cn.id
-    `).all() as Boisson[];
-}
-
-export function getBoissonById(id: number): Boisson | undefined {
-	return db.prepare(`
-        SELECT 
-            b.*,
-            ct.nom as contenu_nom, ct.type as contenu_type, ct.degre as contenu_degre,
-            cn.nom as contenant_nom, cn.capacite as contenant_capacite, cn.type as contenant_type
-        FROM boissons b
-        LEFT JOIN contenus ct ON b.id_contenu = ct.id
-        LEFT JOIN contenants cn ON b.id_contenant = cn.id
-        WHERE b.id = ?
-    `).get(id) as Boisson | undefined;
 }
 
 // ========== CONTENUS ==========
@@ -300,25 +250,11 @@ export function createContenant(contenant: Omit<Contenant, 'id'>) {
 	return stmt.run(contenant.nom, contenant.capacite, contenant.type);
 }
 
-// ========== CONSOMMABLES ==========
-
-export function getAllConsommables(): Consommable[] {
-	return db.prepare('SELECT * FROM consommables ORDER BY nom').all() as Consommable[];
-}
-
-export function createConsommable(consommable: Omit<Consommable, 'id'>) {
-	const stmt = db.prepare(`
-        INSERT INTO consommables (nom, prix_vente)
-        VALUES (?, ?)
-    `);
-	return stmt.run(consommable.nom, consommable.prix_vente);
-}
-
 // ========== PERMS ==========
 
 export function getAllPerms(): Perm[] {
 	return db.prepare(`
-        SELECT p.*, n.nom, n.annee, n.is_active
+        SELECT p.*, n.nom, n.annee, n.is_active as is_open
         FROM perms p
         JOIN noms_perms n ON p.id_nom_perm = n.id
         ORDER BY p.date DESC
@@ -346,6 +282,224 @@ export function createPerm(perm: Omit<Perm, 'id'>) {
     `);
 	return stmt.run(perm.id_nom_perm, perm.date, perm.total_vente, perm.total_litre);
 }
+
+// ========== BOISSONS ==========
+
+export function getAllBoissons(): Boisson[] {
+	return db.prepare(`
+        SELECT 
+            b.*,
+            c.nom as contenu_nom, c.degre as contenu_degre, c.type as contenu_type, c.description as contenu_description,
+            ct.nom as contenant_nom, ct.capacite as contenant_capacite, ct.type as contenant_type
+        FROM boissons b
+        JOIN contenus c ON b.id_contenu = c.id
+        JOIN contenants ct ON b.id_contenant = ct.id
+        ORDER BY c.nom
+    `).all() as Boisson[];
+}
+
+export function getBoissonById(id: number): Boisson | undefined {
+	return db.prepare(`
+        SELECT 
+            b.*,
+            c.nom as contenu_nom, c.degre as contenu_degre, c.description as contenu_description,
+            ct.nom as contenant_nom, ct.capacite as contenant_capacite, ct.type as contenant_type
+        FROM boissons b
+        JOIN contenus c ON b.id_contenu = c.id
+        JOIN contenants ct ON b.id_contenant = ct.id
+        WHERE b.id = ?
+    `).get(id) as Boisson | undefined;
+}
+
+export function createBoisson(boisson: Omit<Boisson, 'id' | 'contenu' | 'contenant'>) {
+	const stmt = db.prepare(`
+        INSERT INTO boissons (id_contenu, id_contenant, prix_achat, consigne, prix_vente, nb_plein, nb_vide, nb_commande, volume_restant, icone, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+	return stmt.run(
+		boisson.id_contenu,
+		boisson.id_contenant,
+		boisson.prix_achat,
+		boisson.consigne,
+		boisson.prix_vente,
+		boisson.nb_plein || 0,
+		boisson.nb_vide || 0,
+		boisson.nb_commande || 0,
+		boisson.volume_restant || 0,
+		boisson.icone || 'Beer',
+		boisson.description || null
+	);
+}
+
+export function updateBoisson(id: number, boisson: Partial<Boisson>) {
+	const fields: string[] = [];
+	const values: (string | number | null)[] = [];
+
+	if (boisson.prix_achat !== undefined) {
+		fields.push('prix_achat = ?'); values.push(boisson.prix_achat);
+	}
+	if (boisson.consigne !== undefined) {
+		fields.push('consigne = ?'); values.push(boisson.consigne);
+	}
+	if (boisson.prix_vente !== undefined) {
+		fields.push('prix_vente = ?'); values.push(boisson.prix_vente);
+	}
+	if (boisson.nb_plein !== undefined) {
+		fields.push('nb_plein = ?'); values.push(boisson.nb_plein);
+	}
+	if (boisson.nb_vide !== undefined) {
+		fields.push('nb_vide = ?'); values.push(boisson.nb_vide);
+	}
+	if (boisson.nb_commande !== undefined) {
+		fields.push('nb_commande = ?'); values.push(boisson.nb_commande);
+	}
+	if (boisson.volume_restant !== undefined) {
+		fields.push('volume_restant = ?'); values.push(boisson.volume_restant);
+	}
+	if (boisson.icone !== undefined) {
+		fields.push('icone = ?'); values.push(boisson.icone);
+	}
+	if (boisson.description !== undefined) {
+		fields.push('description = ?'); values.push(boisson.description);
+	}
+
+	if (fields.length === 0) {
+		return;
+	}
+
+	values.push(id);
+	return db.prepare(`UPDATE boissons SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+// ========== CONSOMMABLES ==========
+
+export function getAllConsommables(): Consommable[] {
+	return db.prepare('SELECT * FROM consommables ORDER BY nom').all() as Consommable[];
+}
+
+export function getConsommableById(id: number): Consommable | undefined {
+	return db.prepare('SELECT * FROM consommables WHERE id = ?').get(id) as Consommable | undefined;
+}
+
+export function createConsommable(consommable: Omit<Consommable, 'id'>) {
+	const stmt = db.prepare(`
+        INSERT INTO consommables (nom, prix_vente, prix_achat, stock, icone, description)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `);
+	return stmt.run(
+		consommable.nom,
+		consommable.prix_vente,
+		consommable.prix_achat || 0,
+		consommable.stock || 0,
+		consommable.icone || 'Utensils',
+		consommable.description || null
+	);
+}
+
+export function updateConsommable(id: number, consommable: Partial<Consommable>) {
+	const fields: string[] = [];
+	const values: (string | number | null)[] = [];
+
+	if (consommable.nom !== undefined) {
+		fields.push('nom = ?'); values.push(consommable.nom);
+	}
+	if (consommable.prix_vente !== undefined) {
+		fields.push('prix_vente = ?'); values.push(consommable.prix_vente);
+	}
+	if (consommable.prix_achat !== undefined) {
+		fields.push('prix_achat = ?'); values.push(consommable.prix_achat);
+	}
+	if (consommable.stock !== undefined) {
+		fields.push('stock = ?'); values.push(consommable.stock);
+	}
+	if (consommable.icone !== undefined) {
+		fields.push('icone = ?'); values.push(consommable.icone);
+	}
+	if (consommable.description !== undefined) {
+		fields.push('description = ?'); values.push(consommable.description);
+	}
+
+	if (fields.length === 0) {
+		return;
+	}
+
+	values.push(id);
+	return db.prepare(`UPDATE consommables SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+// ========== STATS & BILAN ==========
+
+export function getPermStats(permId: number) {
+	// Requires joining transactions with item details
+	// Only 'B' (Boissons) and 'C' (Consommables) types are relevant for sales stats
+	const transactions = db.prepare(`
+        SELECT 
+            t.type, t.id_item, t.nb, t.prix,
+            -- Boisson Info
+            c.nom as boisson_nom,
+            ct.nom as contenant_nom,
+            ct.capacite as contenant_capacite,
+            -- Consommable info
+            con.nom as consommable_nom
+        FROM transactions t
+        LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
+        LEFT JOIN contenus c ON b.id_contenu = c.id
+        LEFT JOIN contenants ct ON b.id_contenant = ct.id
+        LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
+        WHERE t.id_perm = ? AND t.type IN ('B', 'C')
+    `).all(permId) as any[];
+
+	// Aggregate in JS to simplify (DB query can get complex with multiple joins)
+	const stats = new Map<string, {
+        nom: string,
+        contenant: string,
+        count: number,
+        total_litre: number,
+        total_prix: number
+    }>();
+
+	for (const t of transactions) {
+		const isBoisson = t.type === 'B';
+		const nom = isBoisson ? t.boisson_nom : t.consommable_nom;
+		const contenant = isBoisson ? t.contenant_nom : 'Unité';
+		const capacite = isBoisson ? (t.contenant_capacite || 0) : 0;
+
+		const key = `${t.type}_${t.id_item}`;
+
+		if (!stats.has(key)) {
+			stats.set(key, {
+				nom: nom || 'Inconnu',
+				contenant: contenant || '-',
+				count: 0,
+				total_litre: 0,
+				total_prix: 0
+			});
+		}
+
+		const entry = stats.get(key)!;
+		entry.count += t.nb;
+		entry.total_prix += t.prix;
+		if (isBoisson) {
+			entry.total_litre += (t.nb * capacite); // Assuming t.nb is usually 1, but if we sell "pints" from a keg, is 'nb' the number of glasses?
+			// If it is a keg, transaction usually represents 1 glass.
+			// In SQL schema, 'nb' is count.
+			// Currently transactions don't store volume served, just 'nb'.
+			// Assuming 'contenant_capacite' is the volume of the container SOLD.
+			// If we sell a 'inte' (0.5L) from a keg, the 'boisson' item should represent the 'Pinte', not the 'Fût'.
+			// However, typical Le Cercle model: Item = "Fût de Chouffe". Selling it means... what?
+			// If they sell glasses, they usually have a Boisson "Demi Chouffe" and "Pinte Chouffe" which are 'verre' containers.
+			// If the item is "Fût", they sell the whole keg?
+			// User context: "Chargement d'un fût". "Le volume restant".
+			// So they track the Fût stock. But sell glasses.
+			// If they sell glasses, the item in transaction links to... ?
+			// Usually we have separate items "Pinte" linked to same content.
+			// For now, simple aggregation: nb * capacity.
+		}
+	}
+
+	return Array.from(stats.values()).sort((a, b) => b.total_prix - a.total_prix);
+}
+
 
 // ========== STATS ==========
 
@@ -402,6 +556,12 @@ export function getActivePermForUser(userId: number): Perm | undefined {
 }
 
 export function openPerm(permId: number) {
+	// Check if any perm is already open (is_active = 1)
+	const activePerm = getActivePerm();
+	if (activePerm && activePerm.id !== permId) {
+		throw new Error("Une autre permanence est déjà ouverte. Veuillez la fermer avant d'en ouvrir une nouvelle.");
+	}
+
 	const perm = db.prepare('SELECT id_nom_perm FROM perms WHERE id = ?').get(permId) as { id_nom_perm: number } | undefined;
 	if (!perm) {
 		throw new Error('Perm not found');
@@ -454,4 +614,37 @@ export function deletePerm(permId: number) {
 	}
 
 	return { changes: 1 };
+}
+
+// ========== CARTE PERM ==========
+
+export function getPermCarte(idNomPerm: number) {
+	const items = db.prepare(`
+        SELECT cp.type, cp.id_item
+        FROM carte_perm cp
+        WHERE cp.id_nom_perm = ?
+    `).all(idNomPerm) as { type: 'B' | 'C', id_item: number }[];
+
+	// Enrichir avec les détails
+	// Note: ce n'est pas le plus performant (N+1 queries) mais simple à implémenter pour SQLite
+	// et le nombre d'items sur une carte est faible (< 50).
+	return items.map(item => {
+		if (item.type === 'B') {
+			return { ...item, detail: getBoissonById(item.id_item) };
+		} else {
+			return { ...item, detail: getConsommableById(item.id_item) };
+		}
+	});
+}
+
+export function addItemToPermCarte(idNomPerm: number, type: 'B' | 'C', idItem: number) {
+	return db.prepare('INSERT OR IGNORE INTO carte_perm (id_nom_perm, type, id_item) VALUES (?, ?, ?)').run(idNomPerm, type, idItem);
+}
+
+export function removeItemFromPermCarte(idNomPerm: number, type: 'B' | 'C', idItem: number) {
+	return db.prepare('DELETE FROM carte_perm WHERE id_nom_perm = ? AND type = ? AND id_item = ?').run(idNomPerm, type, idItem);
+}
+
+export function getPermCarteIds(idNomPerm: number) {
+	return db.prepare('SELECT type, id_item FROM carte_perm WHERE id_nom_perm = ?').all(idNomPerm) as { type: 'B' | 'C', id_item: number }[];
 }

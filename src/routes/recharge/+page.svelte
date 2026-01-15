@@ -1,179 +1,148 @@
 <script lang="ts">
     import Icon from '$lib/components/Icon.svelte';
-    
-    // Mock Users for search
-    const users = [
-        { id: 1, prenom: "Lucas", nom: "Etudiant", promo: 2026, solde: 1450, email: "lucas@emse.fr" },
-        { id: 2, prenom: "Emma", nom: "Ingenieure", promo: 2025, solde: -250, email: "emma@emse.fr" },
-        { id: 3, prenom: "Paul", nom: "Barman", promo: 2024, solde: 5000, email: "paul@emse.fr" }
-    ];
+    import PageBackground from '$lib/components/PageBackground.svelte';
+    import UserSearch from '$lib/components/UserSearch.svelte';
+    import { fade } from 'svelte/transition';
 
-    let items = $state(users);
-    let searchTerm = $state("");
-    let selectedUser = $state<typeof users[0] | null>(null);
-    let amount = $state(0);
-    let isSuccess = $state(false);
+    let selectedUser = $state<any>(null);
+    let amount = $state<number>(10);
+    let customAmount = $state<string>('');
+    let loading = $state(false);
+    let success = $state(false);
+    let error = $state('');
 
-    let filteredUsers = $derived(
-        searchTerm.length > 1 
-            ? items.filter(u => `${u.prenom} ${u.nom}`.toLowerCase().includes(searchTerm.toLowerCase()))
-            : []
-    );
+    const quickAmounts = [5, 10, 20, 50];
 
-    function selectUser(user: typeof users[0]) {
-        selectedUser = user;
-        searchTerm = "";
-        amount = 0;
-        isSuccess = false;
-    }
-
-    function adjustAmount(delta: number) {
-        amount += delta;
-    }
-
-    function validate() {
+    async function handleRecharge() {
         if (!selectedUser) return;
-        // Mock API Call
-        selectedUser.solde += amount * 100;
-        isSuccess = true;
-        setTimeout(() => {
-            isSuccess = false;
-            selectedUser = null;
-        }, 2000);
+        
+        loading = true;
+        error = '';
+        
+        const finalAmount = customAmount ? parseFloat(customAmount) : amount;
+
+        try {
+            const res = await fetch('/api/recharge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: selectedUser.id, amount: finalAmount })
+            });
+            
+            if (res.ok) {
+                success = true;
+                const updatedUser = await res.json(); // Assuming API returns updated user or we just clear
+                // Visual feedback
+                setTimeout(() => {
+                    success = false;
+                    selectedUser = null;
+                    customAmount = '';
+                    amount = 10;
+                }, 2000);
+            } else {
+                const data = await res.json();
+                error = data.error || 'Erreur lors du rechargement';
+            }
+        } catch (e) {
+            error = "Erreur de connexion";
+        } finally {
+            loading = false;
+        }
     }
 
-    function formatCurrency(cents: number) {
-        return (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+    function selectUser(u: any) {
+        selectedUser = u;
+        error = '';
     }
 </script>
 
-<div class="max-w-2xl mx-auto p-4 md:p-8 space-y-6">
-    <h1 class="text-3xl font-black mb-6">Rechargement</h1>
+<PageBackground variant="gradient" />
 
-    <!-- Search Section -->
-    <div class="relative z-20">
-        <div class="flex items-center bg-bg-card border border-border rounded-xl p-3 shadow-sm focus-within:ring-2 focus-within:ring-brand-red/50">
-            <Icon name="Search" class="text-text-muted mr-3" />
-            <input 
-                type="text" 
-                bind:value={searchTerm}
-                placeholder="Rechercher un étudiant (nom, prénom)" 
-                class="bg-transparent border-none outline-none w-full text-lg placeholder-text-muted/50"
-            />
-            {#if selectedUser}
-                <button onclick={() => selectedUser = null} class="text-text-muted hover:text-brand-red">
-                    <Icon name="X" />
-                </button>
+<div class="max-w-2xl mx-auto pt-24 px-4 pb-32 md:pb-20">
+    <header class="mb-10 text-center">
+        <h1 class="text-4xl font-black uppercase tracking-tighter italic mb-2 text-white">Rechargement</h1>
+        <p class="text-slate-400 font-medium">Alimentez les comptes de la communauté</p>
+    </header>
+
+    <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+        
+        {#if success}
+            <div class="absolute inset-0 bg-emerald-500/90 flex flex-col items-center justify-center z-50 text-white" transition:fade>
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center text-emerald-500 mb-4 animate-bounce">
+                    <Icon name="Check" size={32} />
+                </div>
+                <h2 class="text-2xl font-bold">Rechargement effectué !</h2>
+                <p class="opacity-90">Le solde a été mis à jour.</p>
+            </div>
+        {/if}
+
+        <!-- 1. Selection User -->
+        <div class="mb-8">
+            <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-3" for="user-search">1. Sélectionner un soiffard</label>
+            {#if !selectedUser}
+                <UserSearch id="user-search" onSelect={selectUser} placeholder="Rechercher par nom, prénom..." />
+            {:else}
+                <div class="flex items-center justify-between bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-rose-500 flex items-center justify-center font-bold text-white text-lg overflow-hidden">
+                            {#if selectedUser.photo_url}
+                                <img src={selectedUser.photo_url} alt="Avatar" class="w-full h-full object-cover" />
+                            {:else}
+                                {selectedUser.prenom ? selectedUser.prenom[0] : '?'}{selectedUser.nom ? selectedUser.nom[0] : '?'}
+                            {/if}
+                        </div>
+                        <div>
+                            <div class="font-bold text-white text-lg">{selectedUser.prenom} {selectedUser.nom}</div>
+                            <div class="text-rose-400 font-mono text-sm">{selectedUser.solde?.toFixed(2) || '0.00'} € actuels</div>
+                        </div>
+                    </div>
+                    <button onclick={() => selectedUser = null} class="p-2 hover:bg-rose-500/20 rounded-lg text-rose-500 transition-colors">
+                        <Icon name="X" />
+                    </button>
+                </div>
             {/if}
         </div>
 
-        <!-- Autocomplete Suggestions -->
-        {#if filteredUsers.length > 0}
-            <div class="absolute top-full left-0 w-full bg-bg-card border border-border mt-1 rounded-xl shadow-xl overflow-hidden">
-                {#each filteredUsers as user}
+        <!-- 2. Montant -->
+        <div class="transition-all duration-500 {selectedUser ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-4 pointer-events-none grayscale'}">
+            <div class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-3">2. Choisir le montant</div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                {#each quickAmounts as val}
                     <button 
-                        onclick={() => selectUser(user)}
-                        class="w-full text-left p-4 hover:bg-bg-secondary flex justify-between items-center transition-colors border-b last:border-0 border-border"
+                        class="h-14 rounded-xl border-2 font-black text-xl flex items-center justify-center transition-all active:scale-95
+                        {amount === val && !customAmount ? 'border-amber-500 bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'border-white/10 bg-white/5 hover:bg-white/10 text-slate-300'}"
+                        onclick={() => { amount = val; customAmount = ''; }}
                     >
-                        <div>
-                            <div class="font-bold">{user.prenom} {user.nom}</div>
-                            <div class="text-xs text-text-muted">Promo {user.promo}</div>
-                        </div>
-                        <div class="font-mono {user.solde < 0 ? 'text-brand-red' : 'text-green-600'}">
-                            {formatCurrency(user.solde)}
-                        </div>
+                        {val} €
                     </button>
                 {/each}
             </div>
-        {/if}
-    </div>
 
-    <!-- Recharge Card -->
-    {#if selectedUser}
-        <div class="bg-bg-card rounded-2xl shadow-lg border border-border p-6 animate-in slide-in-from-bottom-4 duration-300">
-            {#if isSuccess}
-                <div class="flex flex-col items-center justify-center py-10 text-green-600 animate-in zoom-in duration-300">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                        <Icon name="Check" size={32} />
-                    </div>
-                    <h3 class="text-xl font-bold">Rechargement effectué !</h3>
-                    <p class="text-text-muted">Nouveau solde : {formatCurrency(selectedUser.solde)}</p>
-                </div>
-            {:else}
-                <div class="flex justify-between items-start mb-8">
-                    <div>
-                        <h2 class="text-2xl font-bold">{selectedUser.prenom} {selectedUser.nom}</h2>
-                        <p class="text-text-muted">Promo {selectedUser.promo}</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm text-text-muted">Solde actuel</div>
-                        <div class="text-2xl font-bold font-mono {selectedUser.solde < 0 ? 'text-brand-red' : 'text-text-primary'}">
-                            {formatCurrency(selectedUser.solde)}
-                        </div>
-                    </div>
-                </div>
+            <div class="relative mb-8">
+                <input 
+                    type="number" 
+                    placeholder="Montant personnalisé" 
+                    bind:value={customAmount}
+                    class="w-full bg-black/20 border-2 border-white/10 rounded-xl py-3 pl-4 pr-12 font-mono font-bold text-white focus:outline-none focus:border-amber-500 transition-all {customAmount ? 'border-amber-500/50 text-amber-500' : 'text-slate-300'}"
+                />
+                <span class="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-500">€</span>
+            </div>
 
-                <!-- Input Amount -->
-                <div class="flex flex-col items-center gap-6 mb-8">
-                    <div class="flex items-center gap-4">
-                        <button onclick={() => adjustAmount(-5)} class="w-12 h-12 rounded-full bg-bg-secondary hover:bg-brand-red/10 hover:text-brand-red flex items-center justify-center transition-colors">
-                            <Icon name="Minus" />
-                        </button>
-                        
-                        <div class="relative">
-                            <input 
-                                type="number" 
-                                bind:value={amount} 
-                                class="text-5xl font-bold w-48 text-center bg-transparent outline-none appearance-none m-0"
-                            />
-                            <span class="absolute top-1/2 -translate-y-1/2 right-4 text-2xl text-text-muted">€</span>
-                        </div>
-
-                        <button onclick={() => adjustAmount(5)} class="w-12 h-12 rounded-full bg-bg-secondary hover:bg-green-100 hover:text-green-600 flex items-center justify-center transition-colors">
-                            <Icon name="Plus" />
-                        </button>
-                    </div>
-
-                    <div class="flex gap-2">
-                        {#each [5, 10, 20, 50] as val}
-                            <button 
-                                onclick={() => amount = val}
-                                class="px-3 py-1 bg-bg-secondary rounded-lg text-sm font-medium hover:bg-brand-yellow/20 hover:text-brand-dark transition-colors"
-                            >
-                                {val}€
-                            </button>
-                        {/each}
-                    </div>
-                </div>
-
-                <!-- Summary & Action -->
-                <div class="bg-bg-secondary/50 rounded-xl p-4 flex justify-between items-center mb-6">
-                    <span class="font-medium text-text-muted">Solde après transaction</span>
-                    <span class="font-bold text-xl">{formatCurrency(selectedUser.solde + amount * 100)}</span>
-                </div>
-
-                <button 
-                    onclick={validate}
-                    disabled={amount === 0}
-                    class="w-full bg-brand-red text-white font-bold py-4 rounded-xl shadow-md hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                    <Icon name="Zap" />
-                    Valider le rechargement
-                </button>
+            <button 
+                onclick={handleRecharge}
+                disabled={loading}
+                class="w-full py-4 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white font-black uppercase tracking-widest shadow-lg shadow-rose-600/20 hover:shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+                {#if loading}
+                    <Icon name="Loader2" class="animate-spin" /> Traitement...
+                {:else}
+                    <Icon name="Zap" /> Valider le rechargement
+                {/if}
+            </button>
+            
+            {#if error}
+                <p class="mt-4 text-center text-red-500 font-bold">{error}</p>
             {/if}
-        </div>
-    {/if}
-
-    <!-- Recent History (Placeholder) -->
-    <div class="mt-12">
-        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-            <Icon name="History" size={18} />
-            Derniers rechargements
-        </h3>
-        <div class="bg-bg-card rounded-xl border border-border overflow-hidden">
-             <div class="p-4 text-center text-text-muted italic">
-                 Aucun historique récent.
-             </div>
         </div>
     </div>
 </div>

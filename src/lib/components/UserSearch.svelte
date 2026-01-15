@@ -5,12 +5,16 @@
         placeholder = "Rechercher un utilisateur...",
         onSelect,
         disabled = false,
-        id = undefined
+        id = undefined,
+        class: className = "",
+        ...rest
     }: {
         placeholder?: string;
         onSelect: (user: any) => void;
         disabled?: boolean;
         id?: string;
+        class?: string;
+        [key: string]: any;
     } = $props();
     
     let query = $state('');
@@ -47,8 +51,14 @@
     }
     
     $effect(() => {
-        const timer = setTimeout(search, 300);
-        return () => clearTimeout(timer);
+        // Dependency on query for searching
+        if (query.length >= 2) {
+             const timer = setTimeout(search, 300);
+             return () => clearTimeout(timer);
+        } else {
+             results = [];
+             showDropdown = false;
+        }
     });
 </script>
 
@@ -60,7 +70,8 @@
             bind:value={query}
             {placeholder}
             {disabled}
-            class="w-full px-4 py-2 pl-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red bg-bg-primary text-text-primary"
+            class={className || "w-full px-4 py-2 pl-10 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-red bg-bg-primary text-text-primary"}
+            {...rest}
         />
         <Icon name="Search" size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         {#if loading}

@@ -1,124 +1,310 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import Icon from '$lib/components/Icon.svelte';
+    import PageBackground from '$lib/components/PageBackground.svelte';
+    import UserSearch from '$lib/components/UserSearch.svelte';
+
+    let perms = $state<any[]>([]);
+    let loading = $state(true);
+    let showCreateModal = $state(false);
+    let showEditModal = $state(false);
+    let editingPerm = $state<any>(null);
     
-    // Mock Data
-    const items = [
-        { id: 1, name: "Pinte Blonde", type: "biere", price: 350, stock: "fut" },
-        { id: 2, name: "Pinte Rouge", type: "biere", price: 400, stock: "fut" },
-        { id: 3, name: "Coca Cola", type: "soft", price: 100, stock: "canette" },
-        { id: 4, name: "Chips", type: "snack", price: 150, stock: "sachet" },
-    ];
+    // Formulaire création
+    let newPermName = $state('');
+    let newPermDate = $state(new Date().toISOString().split('T')[0]);
+    let selectedBarmans = $state<any[]>([]);
 
-    let permName = $state("");
-    let inventory = $state(items.map(i => ({...i, active: true})));
-    let newPermMode = $state(true);
+    onMount(async () => {
+        await loadPerms();
+    });
 
-    function toggleActive(id: number) {
-        const idx = inventory.findIndex(i => i.id === id);
-        if (idx !== -1) inventory[idx].active = !inventory[idx].active;
+    async function loadPerms() {
+        loading = true;
+        try {
+            const res = await fetch('/api/perms');
+            if (res.ok) {
+                perms = await res.json();
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            loading = false;
+        }
     }
 
-    function updatePrice(id: number, delta: number) {
-        const idx = inventory.findIndex(i => i.id === id);
-        if (idx !== -1) inventory[idx].price = Math.max(0, inventory[idx].price + delta);
+    async function createPerm() {
+        if (!newPermName.trim()) {
+            alert('Veuillez entrer un nom');
+            return;
+        }
+
+        try {
+            const year = new Date(newPermDate).getFullYear().toString();
+            const res = await fetch('/api/perms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nom: newPermName, annee: year })
+            });
+
+            if (res.ok) {
+                const { permId } = await res.json();
+                
+                // Assigner les barmans
+                for (const barman of selectedBarmans) {
+                    await fetch('/api/perms', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ permId, action: 'assign', userId: barman.id })
+                    });
+                }
+
+                await loadPerms();
+                closeCreateModal();
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Erreur lors de la création');
+        }
     }
 
-    function formatPrice(cents: number) {
-        return (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+    async function togglePerm(perm: any) {
+        try {
+            const action = perm.is_open ? 'close' : 'open';
+            const res = await fetch('/api/perms', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ permId: perm.id, action })
+            });
+
+            if (res.ok) {
+                await loadPerms();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function deletePerm(id: number) {
+        if (!confirm('Supprimer cette permanence ?')) return;
+
+        try {
+            const res = await fetch(`/api/perms?id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                await loadPerms();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function openCreateModal() {
+        newPermName = '';
+        newPermDate = new Date().toISOString().split('T')[0];
+        selectedBarmans = [];
+        showCreateModal = true;
+    }
+
+    function closeCreateModal() {
+        showCreateModal = false;
+    }
+
+    function openEditModal(perm: any) {
+        editingPerm = perm;
+        showEditModal = true;
+    }
+
+    function closeEditModal() {
+        showEditModal = false;
+        editingPerm = null;
+    }
+
+    async function loadPermBarmans(permId: number) {
+        const res = await fetch(`/api/perms/${permId}`);
+        if (res.ok) {
+            const data = await res.json();
+            return data.barmans || [];
+        }
+        return [];
+    }
+
+    async function removeBarman(permId: number, userId: number) {
+        await fetch('/api/perms', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ permId, action: 'remove', userId })
+        });
+        await loadPerms();
+    }
+
+    async function addBarman(permId: number, user: any) {
+        await fetch('/api/perms', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ permId, action: 'assign', userId: user.id })
+        });
+        await loadPerms();
     }
 </script>
 
-<div class="max-w-4xl mx-auto p-4 md:p-8">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h1 class="text-3xl font-black">Ouvrir une perm</h1>
-        
-        <div class="flex bg-bg-secondary p-1 rounded-lg">
-            <button 
-                class="px-4 py-2 rounded-md font-medium text-sm transition-all {newPermMode ? 'bg-bg-card shadow-sm text-brand-dark' : 'text-text-muted hover:text-text-primary'}"
-                onclick={() => newPermMode = true}
-            >
-                Nouvelle
-            </button>
-            <button 
-                class="px-4 py-2 rounded-md font-medium text-sm transition-all {!newPermMode ? 'bg-bg-card shadow-sm text-brand-dark' : 'text-text-muted hover:text-text-primary'}"
-                onclick={() => newPermMode = false}
-            >
-                Réouvrir
-            </button>
-        </div>
-    </div>
+<PageBackground variant="minimal" />
 
-    <!-- Configuration Card -->
-    <div class="bg-bg-card rounded-2xl shadow-sm border border-border p-6 mb-8">
-        <div class="mb-8">
-            <label for="permName" class="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wide">Nom de la perm</label>
-            <input 
-                id="permName"
-                type="text" 
-                bind:value={permName}
-                placeholder="Ex: Soirée Integration, Perm Midi..."
-                class="w-full bg-bg-secondary border border-border rounded-xl px-4 py-3 font-bold text-lg outline-none focus:ring-2 focus:ring-brand-yellow/50"
-            />
-        </div>
-
-        <div class="mb-4 flex justify-between items-end">
-             <h2 class="text-xl font-bold flex items-center gap-2">
-                <Icon name="ClipboardList" />
-                La Carte
-            </h2>
-            <button class="text-sm text-brand-red font-medium hover:underline flex items-center gap-1">
-                <Icon name="Plus" size={14} /> Ajouter un produit
+<div class="min-h-screen pt-24 pb-32 md:pb-20 px-4 max-w-6xl mx-auto">
+    <header class="mb-10">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="p-4 rounded-2xl bg-amber-500/10 text-amber-500">
+                    <Icon name="CalendarCheck" size={32} />
+                </div>
+                <div>
+                    <h1 class="text-4xl font-black uppercase tracking-tighter italic text-text-primary">
+                        Permanences
+                    </h1>
+                    <p class="text-text-muted font-medium">Gérer les événements</p>
+                </div>
+            </div>
+            <button
+                onclick={openCreateModal}
+                class="px-6 py-3 rounded-xl bg-brand-red text-white font-bold uppercase text-sm hover:bg-brand-red/90 transition-all"
+            >
+                <div class="flex items-center gap-2">
+                    <Icon name="Plus" size={20} />
+                    Nouvelle Perm
+                </div>
             </button>
         </div>
-       
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-            {#each inventory as item}
-                <div class="flex items-center justify-between p-4 rounded-xl border transition-all {item.active ? 'bg-bg-card border-brand-yellow/30 shadow-sm' : 'bg-bg-secondary/30 border-dashed border-border opacity-60'}">
-                    <div class="flex items-center gap-4">
-                        <button 
-                            onclick={() => toggleActive(item.id)}
-                            class="w-6 h-6 rounded border flex items-center justify-center transition-colors {item.active ? 'bg-brand-yellow border-brand-yellow text-brand-dark' : 'border-text-muted text-transparent'}"
-                        >
-                            <Icon name="Check" size={14} />
-                        </button>
-                        
-                        <div>
-                            <div class="font-bold">{item.name}</div>
-                            <div class="text-xs text-text-muted uppercase">{item.type} • {item.stock}</div>
+    </header>
+
+    {#if loading}
+        <div class="flex items-center justify-center h-64">
+            <Icon name="Loader2" class="animate-spin text-brand-red" size={48} />
+        </div>
+    {:else if perms.length === 0}
+        <div class="text-center py-20">
+            <div class="p-6 rounded-full bg-bg-card inline-block mb-4">
+                <Icon name="CalendarOff" size={64} class="text-text-muted" />
+            </div>
+            <h3 class="text-xl font-bold text-text-primary mb-2">Aucune permanence</h3>
+            <p class="text-text-muted mb-6">Créez votre première permanence</p>
+            <button
+                onclick={openCreateModal}
+                class="px-6 py-3 rounded-xl bg-brand-red text-white font-bold uppercase text-sm hover:bg-brand-red/90 transition-all"
+            >
+                Créer une perm
+            </button>
+        </div>
+    {:else}
+        <div class="grid gap-4">
+            {#each perms as perm (perm.id)}
+                <div class="bg-bg-card border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <h3 class="text-xl font-bold text-text-primary">{perm.nom}</h3>
+                                {#if perm.is_open}
+                                    <span class="px-3 py-1 rounded-full bg-success/20 text-success text-xs font-bold uppercase">
+                                        Ouverte
+                                    </span>
+                                {:else}
+                                    <span class="px-3 py-1 rounded-full bg-text-muted/20 text-text-muted text-xs font-bold uppercase">
+                                        Fermée
+                                    </span>
+                                {/if}
+                            </div>
+                            <p class="text-text-muted text-sm">
+                                {new Date(perm.date * 1000).toLocaleDateString('fr-FR')} • {perm.annee}
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button
+                                onclick={() => togglePerm(perm)}
+                                class="px-4 py-2 rounded-lg {perm.is_open ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-success/10 text-success hover:bg-success/20'} font-bold text-xs uppercase transition-all"
+                            >
+                                {perm.is_open ? 'Fermer' : 'Ouvrir'}
+                            </button>
+                            <button
+                                onclick={() => openEditModal(perm)}
+                                class="px-4 py-2 rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-primary font-bold text-xs uppercase transition-all"
+                            >
+                                Modifier
+                            </button>
+                            <button
+                                onclick={() => deletePerm(perm.id)}
+                                class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold text-xs uppercase transition-all"
+                            >
+                                Supprimer
+                            </button>
                         </div>
                     </div>
-
-                    {#if item.active}
-                        <div class="flex items-center gap-2 bg-bg-secondary rounded-lg p-1">
-                            <button onclick={() => updatePrice(item.id, -10)} class="w-8 h-8 flex items-center justify-center hover:bg-bg-card rounded shadow-sm text-brand-red">
-                                <Icon name="Minus" size={14} />
-                            </button>
-                            <span class="font-mono font-bold w-12 text-center text-sm">{formatPrice(item.price)}</span>
-                            <button onclick={() => updatePrice(item.id, 10)} class="w-8 h-8 flex items-center justify-center hover:bg-bg-card rounded shadow-sm text-green-600">
-                                <Icon name="Plus" size={14} />
-                            </button>
-                        </div>
-                    {/if}
                 </div>
             {/each}
         </div>
-    </div>
+    {/if}
+</div>
 
-    <!-- Action Bar -->
-    <div class="fixed bottom-16 md:bottom-0 left-0 w-full bg-bg-card border-t border-border p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-40">
-        <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <div class="hidden md:block">
-                <span class="text-text-muted text-sm">Prêt à servir ?</span>
-                <div class="font-bold">{inventory.filter(i => i.active).length} produits à la carte</div>
+<!-- Modal Création -->
+{#if showCreateModal}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onclick={closeCreateModal}>
+        <div class="bg-bg-card border border-white/10 rounded-2xl p-8 max-w-2xl w-full" onclick={(e) => e.stopPropagation()}>
+            <h2 class="text-2xl font-bold text-text-primary mb-6">Nouvelle Permanence</h2>
+            
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm font-bold text-text-muted mb-2">Nom de l'événement</label>
+                    <input
+                        type="text"
+                        bind:value={newPermName}
+                        placeholder="Ex: Soirée Intégration 2026"
+                        class="w-full px-4 py-3 rounded-xl bg-bg-secondary border border-white/5 text-text-primary focus:outline-none focus:border-brand-red transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-text-muted mb-2">Date</label>
+                    <input
+                        type="date"
+                        bind:value={newPermDate}
+                        class="w-full px-4 py-3 rounded-xl bg-bg-secondary border border-white/5 text-text-primary focus:outline-none focus:border-brand-red transition-colors"
+                    />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-text-muted mb-2">Barmans</label>
+                    <UserSearch 
+                        onSelect={(user) => {
+                            if (!selectedBarmans.find(b => b.id === user.id)) {
+                                selectedBarmans = [...selectedBarmans, user];
+                            }
+                        }}
+                    />
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {#each selectedBarmans as barman}
+                            <div class="px-3 py-1 rounded-lg bg-bg-secondary border border-white/5 text-text-primary flex items-center gap-2">
+                                <span class="text-sm">{barman.prenom} {barman.nom}</span>
+                                <button onclick={() => selectedBarmans = selectedBarmans.filter(b => b.id !== barman.id)} class="text-red-500 hover:text-red-400">
+                                    <Icon name="X" size={16} />
+                                </button>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
             </div>
-            <button 
-                class="w-full md:w-auto bg-brand-red hover:bg-red-700 text-white font-bold py-3 px-8 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all"
-                disabled={!permName}
-            >
-                <Icon name="Store" />
-                Ouvrir la Perm
-            </button>
+
+            <div class="flex gap-3">
+                <button
+                    onclick={closeCreateModal}
+                    class="flex-1 px-6 py-3 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary font-bold uppercase text-sm transition-all"
+                >
+                    Annuler
+                </button>
+                <button
+                    onclick={createPerm}
+                    class="flex-1 px-6 py-3 rounded-xl bg-brand-red hover:bg-brand-red/90 text-white font-bold uppercase text-sm transition-all"
+                >
+                    Créer
+                </button>
+            </div>
         </div>
     </div>
-    <div class="h-24"></div> <!-- Spacer -->
-</div>
+{/if}

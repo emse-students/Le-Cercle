@@ -3,6 +3,7 @@
 ## ✅ Tables conservées et clarifiées
 
 ### Tables principales
+
 - **`users`** : Utilisateurs avec rôle et statut de cotisation
 - **`contenus`** : Types de boissons (Blonde, Brune, etc.)
 - **`contenants`** : Types de contenants (fût, bouteille, verre, etc.)
@@ -15,6 +16,7 @@
 - **`year_stats`** : Statistiques annuelles (conservées temporairement)
 
 ### Nouvelles tables créées
+
 - **`config_cotisations`** : Montants des cotisations (sans_alcool, avec_alcool)
 - **`perm_barmans`** : Assignation des barmans aux templates de perms
 - **`carte_perm`** : Carte personnalisée de chaque perm (boissons/consommables disponibles)
@@ -22,19 +24,25 @@
 ## ❌ Tables supprimées (redondantes)
 
 ### `membres_perms`
+
 **Raison de suppression** : Redondant avec `perm_barmans`
+
 - L'objectif initial était probablement de lier les membres du cercle à une perm
 - Mais dans la pratique, seuls les barmans ont besoin d'être liés aux perms
 - **Remplacement** : `perm_barmans` gère cette relation
 
 ### `inventaire_perms`
+
 **Raison de suppression** : Redondant avec `carte_perm`
+
 - L'inventaire était censé tracker les stocks par perm
 - Mais la carte personnalisée (`carte_perm`) définit déjà ce qui est disponible
 - **Simplification** : On utilise uniquement `carte_perm` pour définir ce qui peut être vendu
 
 ### Doublon `perm_barmans` (lignes 148-156)
+
 **Raison de suppression** : Définition dupliquée avec une FK incorrecte
+
 - Première définition (lignes 78-86) : Utilise `id_nom_perm` ✅ (correct)
 - Seconde définition (lignes 148-156) : Utilise `id_perm` ❌ (incorrect)
 - **Résolution** : Suppression de la seconde définition
@@ -42,19 +50,24 @@
 ## 🔄 Modifications apportées
 
 ### `users`
+
 **Avant** :
+
 ```sql
 role TEXT DEFAULT 'user' CHECK(role IN ('user', 'cercleux'))
 ```
 
 **Après** :
+
 ```sql
 role TEXT DEFAULT 'user' CHECK(role IN ('user', 'cercleux')),
 statut_cotisation TEXT DEFAULT 'non_cotisant' CHECK(statut_cotisation IN ('non_cotisant', 'cotisant_sans_alcool', 'cotisant_avec_alcool'))
 ```
 
 ### `perms`
+
 **Avant** :
+
 ```sql
 CREATE TABLE IF NOT EXISTS perms (
     id INTEGER PRIMARY KEY,
@@ -67,6 +80,7 @@ CREATE TABLE IF NOT EXISTS perms (
 ```
 
 **Après** :
+
 ```sql
 CREATE TABLE IF NOT EXISTS perms (
     id INTEGER PRIMARY KEY,
@@ -80,7 +94,9 @@ CREATE TABLE IF NOT EXISTS perms (
 ```
 
 ### `transactions`
+
 **Avant** :
+
 ```sql
 type TEXT NOT NULL, -- B, C, A
 id_item INTEGER NOT NULL,
@@ -88,6 +104,7 @@ id_perm INTEGER NOT NULL
 ```
 
 **Après** :
+
 ```sql
 type TEXT NOT NULL CHECK(type IN ('B', 'C', 'R', 'T')), -- B=Boisson, C=Consommable, R=Recharge, T=coTisation
 id_item INTEGER, -- NULL pour recharge/cotisation
@@ -95,19 +112,22 @@ id_perm INTEGER -- NULL pour recharges/cotisations hors perm
 ```
 
 ### `carte_perm`
+
 **Avant** :
+
 ```sql
 type TEXT NOT NULL, -- B ou C
 ```
 
 **Après** :
+
 ```sql
 type TEXT NOT NULL CHECK(type IN ('B', 'C')), -- B=Boisson, C=Consommable
 ```
 
 ## 📊 Schéma relationnel final
 
-```
+```text
 users (role, statut_cotisation)
 ├── transactions (achats, recharges, cotisations)
 │   └── perms (instances avec is_open)

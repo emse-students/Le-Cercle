@@ -1,76 +1,101 @@
 @import "tailwindcss";
 
 :root {
-    /* Le Cercle - Light Theme (Original) */
-    --bg-primary: #efe7d9; /* rgb(239, 231, 217) - Beige du cercle */
-    --bg-secondary: #e6dac6; /* Un peu plus foncé pour les cartes/inputs */
+    /* --- LE CERCLE: LIGHT THEME (Beige Heritage) --- */
+    --bg-primary: #efe7d9;
+    --bg-secondary: #e6dac6;
     --bg-tertiary: #dccdb3;
+    --bg-card: #f9f4ef;
     
     --text-primary: #1a1918;
     --text-secondary: #4a453e;
     --text-muted: #78736b;
     
-    /* Couleurs Brand */
-    --brand-red: #c8331e; /* rgb(200, 51, 30) */
+    /* Brand Colors (Classic Bar Aesthetic) */
+    --brand-red: #c8331e;
     --brand-red-hover: #a62a19;
     --brand-yellow: #fecb00;
     --brand-yellow-hover: #e5b800;
     
+    /* Utility Colors */
+    --success: #10b981;
+    --error: #ef4444;
+    --info: #3b82f6;
+    
     --border: #d6c6a8;
     --border-hover: #c4b08d;
     
-    --bg-card: #f9f4ef;
-    --brand-dark: #1a1918;
-
-    --shadow-sm: 0 1px 2px rgba(26, 25, 24, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(26, 25, 24, 0.1);
-    
-    --radius: 0.5rem;
+    /* Shadows & Effects */
+    --shadow-color: rgba(26, 25, 24, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.5);
 }
 
 [data-theme='dark'] {
-    /* Le Cercle - Dark Theme (Warm Dark) */
-    --bg-primary: #1c1917; /* Stone 900 - Dark warm grey */
-    --bg-secondary: #292524; /* Stone 800 */
-    --bg-tertiary: #44403c; /* Stone 700 */
+    /* --- LE CERCLE: DARK THEME (Warm Charcoal) --- */
+    --bg-primary: #0f0e0d; /* Un noir plus profond et chaud */
+    --bg-secondary: #1a1817;
+    --bg-tertiary: #292624;
+    --bg-card: #1c1a19;
     
-    --text-primary: #f5f5f4; /* Stone 100 */
-    --text-secondary: #a8a29e; /* Stone 400 */
-    --text-muted: #78716c; /* Stone 500 */
+    --text-primary: #f5f5f4;
+    --text-secondary: #a8a29e;
+    --text-muted: #57534e;
     
-    --brand-red: #ef4444; /* Brighter red for dark mode contrast */
-    --brand-red-hover: #dc2626;
-    --brand-yellow: #facc15;
-    --brand-yellow-hover: #eab308;
+    --brand-red: #f43f5e; /* Rose-red plus vibrant pour le contraste sombre */
+    --brand-red-hover: #e11d48;
+    --brand-yellow: #fbbf24;
+    --brand-yellow-hover: #d97706;
     
-    --bg-card: #292524;
-    --brand-dark: #fafaf9;
-
-    --border: #44403c;
-    --border-hover: #57534e;
+    --border: #292624;
+    --border-hover: #44403c;
     
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --glass-bg: rgba(15, 14, 13, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.05);
 }
 
+/* --- BASE STYLES --- */
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    transition: background-color 0.3s ease, color 0.3s ease;
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s ease;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
 }
 
-h1 {
-    color: var(--brand-red);
-    letter-spacing: -1px;
+/* Selection */
+::selection {
+    background-color: var(--brand-red);
+    color: white;
 }
 
-/* Custom Utilities for CSS variables usage in Tailwind */
+/* Custom Scrollbar (Premium look) */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-red);
+}
+
+/* --- TAILWIND 4.0 THEME MAPPING --- */
 @theme {
     --color-bg-primary: var(--bg-primary);
     --color-bg-secondary: var(--bg-secondary);
     --color-bg-tertiary: var(--bg-tertiary);
+    --color-bg-card: var(--bg-card);
     
     --color-text-primary: var(--text-primary);
     --color-text-secondary: var(--text-secondary);
@@ -81,10 +106,42 @@ h1 {
     --color-brand-yellow: var(--brand-yellow);
     --color-brand-yellow-hover: var(--brand-yellow-hover);
     
-    --color-bg-card: var(--bg-card);
-    --color-brand-dark: var(--brand-dark);
+    --color-success: var(--success);
+    --color-error: var(--error);
+    --color-info: var(--info);
     
     --color-border: var(--border);
     --color-border-hover: var(--border-hover);
+
+    --shadow-premium: 0 10px 30px -10px var(--shadow-color);
+    --radius-cercle: 2rem;
 }
 
+/* --- UTILITIES & ANIMATIONS --- */
+@layer utilities {
+    .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+    }
+
+    .text-balance {
+        text-wrap: balance;
+    }
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-cercle-in {
+    animation: fade-in-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}

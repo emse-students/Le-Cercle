@@ -23,6 +23,12 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Missing fields' }, { status: 400 });
 	}
 
-	createConsommable({ nom, prix_vente });
+	createConsommable({
+		nom,
+		prix_vente,
+		prix_achat: 0,
+		stock: 0,
+		icone: 'Utensils'
+	});
 	return json({ success: true });
 };

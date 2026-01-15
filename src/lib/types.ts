@@ -38,15 +38,25 @@ export interface Boisson {
     nb_plein: number;
     nb_vide: number;
     nb_commande: number;
+    volume_restant?: number; // Volume actuel du contenant ouvert
+    icone?: string; // Surchage ou icone définie
+    description?: string; // Surchage ou description définie
     // Joined data
-    contenu?: Contenu;
-    contenant?: Contenant;
+    contenu_nom?: string;
+    contenu_degre?: number;
+    contenant_nom?: string;
+    contenant_capacite?: number;
+    contenant_type?: string;
 }
 
 export interface Consommable {
     id: number;
     nom: string;
     prix_vente: number;
+    prix_achat: number;
+    stock: number;
+    icone: string;
+    description?: string;
 }
 
 export interface NomPerm {

@@ -1,27 +1,42 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireServeur, requireAuth, checkServeurPermAccess } from '$lib/auth';
-import { createTransaction, getPermTransactions } from '$lib/db/queries';
+import { createTransaction, getPermTransactions, getUserTransactions } from '$lib/db/queries';
 
-// GET /api/transactions?permId=123
+// GET /api/transactions?permId=123 OR GET /api/transactions?userId=123
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const permId = event.url.searchParams.get('permId');
+	const userId = event.url.searchParams.get('userId');
 
-	if (!permId) {
-		return json({ error: 'Missing permId' }, { status: 400 });
+	// Historique utilisateur
+	if (userId) {
+		const userIdNum = parseInt(userId);
+
+		// L'utilisateur peut voir son propre historique, ou un cercleux peut voir celui de n'importe qui
+		if (user.id !== userIdNum && user.role !== 'cercleux') {
+			return json({ error: 'Accès refusé' }, { status: 403 });
+		}
+
+		const transactions = getUserTransactions(userIdNum);
+		return json(transactions);
 	}
 
-	const permIdNum = parseInt(permId);
+	// Historique de perm
+	if (permId) {
+		const permIdNum = parseInt(permId);
 
-	// Vérifier que l'utilisateur peut accéder à cette perm
-	const hasAccess = await checkServeurPermAccess(user.id, permIdNum);
-	if (!hasAccess && user.role !== 'cercleux') {
-		return json({ error: 'Accès refusé à cette perm' }, { status: 403 });
+		// Vérifier que l'utilisateur peut accéder à cette perm
+		const hasAccess = await checkServeurPermAccess(user.id, permIdNum);
+		if (!hasAccess && user.role !== 'cercleux') {
+			return json({ error: 'Accès refusé à cette perm' }, { status: 403 });
+		}
+
+		const transactions = getPermTransactions(permIdNum);
+		return json(transactions);
 	}
 
-	const transactions = getPermTransactions(permIdNum);
-	return json(transactions);
+	return json({ error: 'Missing permId or userId' }, { status: 400 });
 };
 
 interface CreateTransactionDTO {

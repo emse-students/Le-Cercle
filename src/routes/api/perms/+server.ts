@@ -21,7 +21,8 @@ export const GET: RequestHandler = (event) => {
 
 interface CreatePermDTO {
 	nom: string;
-	annee: string;
+	date: number; // Unix timestamp
+	barmen: number[]; // Array of user IDs
 }
 
 // POST /api/perms - Create perm
@@ -29,22 +30,36 @@ export const POST: RequestHandler = async (event) => {
 	requireCercleux(event);
 
 	const data = (await event.request.json()) as CreatePermDTO;
-	const { nom, annee } = data;
+	const { nom, date, barmen } = data;
 
-	if (!nom || !annee) {
-		return json({ error: 'Missing nom or annee' }, { status: 400 });
+	if (!nom || !date) {
+		return json({ error: 'Missing nom or date' }, { status: 400 });
 	}
 
 	try {
-		const nomPermStmt = db.prepare('INSERT INTO noms_perms (nom, annee, is_active) VALUES (?, ?, 0)');
-		const nomPermResult = nomPermStmt.run(nom, annee);
-		const nomPermId = Number(nomPermResult.lastInsertRowid);
+		const result = db.transaction(() => {
+			const currentYear = new Date().getFullYear().toString(); // Use current year for noms_perms.annee
 
-		const permStmt = db.prepare('INSERT INTO perms (id_nom_perm, date, total_vente, total_litre) VALUES (?, ?, 0, 0)');
-		const permResult = permStmt.run(nomPermId, Math.floor(Date.now() / 1000));
-		const permId = Number(permResult.lastInsertRowid);
+			const nomPermStmt = db.prepare('INSERT INTO noms_perms (nom, annee, is_active) VALUES (?, ?, 0)');
+			const nomPermResult = nomPermStmt.run(nom, currentYear);
+			const nomPermId = Number(nomPermResult.lastInsertRowid);
 
-		return json({ success: true, permId, nomPermId });
+			const permStmt = db.prepare('INSERT INTO perms (id_nom_perm, date, total_vente, total_litre) VALUES (?, ?, 0, 0)');
+			const permResult = permStmt.run(nomPermId, date);
+			const permId = Number(permResult.lastInsertRowid);
+
+			// Add Barmen
+			if (barmen && barmen.length > 0) {
+				const barmanStmt = db.prepare('INSERT INTO perm_barmans (id_perm, id_user) VALUES (?, ?)');
+				for (const userId of barmen) {
+					barmanStmt.run(permId, userId);
+				}
+			}
+
+			return { permId, nomPermId };
+		})();
+
+		return json({ success: true, ...result });
 	} catch (err: unknown) {
 		return json({ error: (err as Error).message }, { status: 500 });
 	}

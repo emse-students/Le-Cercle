@@ -15,23 +15,29 @@
 		"format:check": "prettier --check .",
 		"db:init": "node ./scripts/init-db.cjs",
 		"test": "vitest",
-		"test:unit": "vitest run"
+		"test:unit": "vitest run",
+		"lint:md": "markdownlint -c .markdownlint.json '**/*.md' --ignore node_modules/**",
+		"prepare": "husky install"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.0.0",
+		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-node": "^5.0.0",
-		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/kit": "^2.49.4",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@tailwindcss/postcss": "^4.0.0-alpha.1",
 		"@tailwindcss/vite": "^4.1.18",
 		"@types/better-sqlite3": "^7.6.9",
-		"@types/node": "^22.10.5",
+		"@types/node": "^25.0.3",
 		"@typescript-eslint/eslint-plugin": "^8.0.0",
 		"@typescript-eslint/parser": "^8.0.0",
 		"autoprefixer": "^10.4.16",
 		"eslint": "^9.0.0",
 		"eslint-config-prettier": "^10.0.0",
 		"eslint-plugin-svelte": "^3.0.0",
+		"markdownlint": "^0.27.0",
+		"markdownlint-cli": "^0.33.0",
+		"husky": "^8.0.0",
+		"lint-staged": "^13.0.0",
 		"postcss": "^8.4.31",
 		"prettier": "^3.0.0",
 		"prettier-plugin-svelte": "^3.0.0",
@@ -40,14 +46,20 @@
 		"svelte-eslint-parser": "^1.4.1",
 		"tailwindcss": "^4.0.0-alpha.1",
 		"typescript": "^5.0.0",
-		"vite": "^5.0.0",
-		"vitest": "^2.0.0"
+		"vite": "^7.3.1",
+		"vitest": "^4.0.16"
+	},
+	"lint-staged": {
+		"*.md": [
+			"markdownlint --fix --config .markdownlint.json",
+			"git add"
+		]
 	},
 	"dependencies": {
 		"@auth/core": "^0.34.0",
 		"@auth/sveltekit": "^1.0.0",
-		"better-sqlite3": "^11.0.0",
-		"dotenv": "^16.4.5",
+		"better-sqlite3": "^12.5.0",
+		"dotenv": "^17.2.3",
 		"lucide-svelte": "^0.562.0",
 		"svelte-adapter-bun": "^0.5.2",
 		"typescript-eslint": "^8.52.0"

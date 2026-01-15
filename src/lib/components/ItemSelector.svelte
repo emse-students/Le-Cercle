@@ -5,18 +5,20 @@
     let { 
         type = 'boisson',
         onSelect,
-        disabled = false
+        disabled = false,
+        items = $bindable([]) // Accept items from parent
     }: {
         type?: 'boisson' | 'consommable';
         onSelect: (item: Boisson | Consommable, quantity: number) => void;
         disabled?: boolean;
+        items?: any[];
     } = $props();
     
-    let items = $state<any[]>([]);
     let selectedItem = $state<any | null>(null);
     let quantity = $state(1);
     
     async function loadItems() {
+        if (items.length > 0) return; // Don't load if provided
         try {
             const endpoint = type === 'boisson' ? '/api/boissons' : '/api/consommables';
             const res = await fetch(endpoint);

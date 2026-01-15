@@ -1,17 +1,37 @@
 {
-	"/": [],
-	"/admin": [],
+	"/": [
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/admin": [
+		"src/routes/+layout.server.ts"
+	],
 	"/api/boissons": [
 		"src/routes/api/boissons/+server.ts"
 	],
+	"/api/boissons/[id]": [
+		"src/routes/api/boissons/[id]/+server.ts"
+	],
 	"/api/consommables": [
 		"src/routes/api/consommables/+server.ts"
+	],
+	"/api/consommables/[id]": [
+		"src/routes/api/consommables/[id]/+server.ts"
 	],
 	"/api/perms": [
 		"src/routes/api/perms/+server.ts"
 	],
 	"/api/perms/active": [
 		"src/routes/api/perms/active/+server.ts"
+	],
+	"/api/perms/[id]": [
+		"src/routes/api/perms/[id]/+server.ts"
+	],
+	"/api/perms/[id]/carte": [
+		"src/routes/api/perms/[id]/carte/+server.ts"
+	],
+	"/api/perms/[id]/stats": [
+		"src/routes/api/perms/[id]/stats/+server.ts"
 	],
 	"/api/recharge": [
 		"src/routes/api/recharge/+server.ts"
@@ -25,6 +45,12 @@
 	"/api/users": [
 		"src/routes/api/users/+server.ts"
 	],
+	"/api/users/[id]": [
+		"src/routes/api/users/[id]/+server.ts"
+	],
+	"/carte": [
+		"src/routes/+layout.server.ts"
+	],
 	"/dev/login-as": [
 		"src/routes/dev/login-as/+server.ts"
 	],
@@ -34,8 +60,16 @@
 	"/dev/recharge": [
 		"src/routes/dev/recharge/+server.ts"
 	],
-	"/open-perm": [],
-	"/profile": [],
-	"/recharge": [],
-	"/serve": []
+	"/open-perm": [
+		"src/routes/+layout.server.ts"
+	],
+	"/profile": [
+		"src/routes/+layout.server.ts"
+	],
+	"/recharge": [
+		"src/routes/+layout.server.ts"
+	],
+	"/serve": [
+		"src/routes/+layout.server.ts"
+	]
 }

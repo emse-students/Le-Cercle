@@ -1,102 +1,203 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
+    import { page } from '$app/stores';
     import Icon from '$lib/components/Icon.svelte';
+    import PageBackground from '$lib/components/PageBackground.svelte';
+    import { formatCurrency, getAvatarUrl } from '$lib/theme-config';
     
-    // Mock user for now
-    let user = {
-        firstname: "Lucas",
-        lastname: "Etudiant",
-        email: "lucas.etudiant@mines-stetienne.fr",
-        balance: 1450, // 14.50€
-        role: "user"
-    };
+    // Get user from layout
+    let user = $derived($page.data.user);
+    
+    // Page load animation state
+    let isLoaded = $state(false);
+    let transactions = $state<any[]>([]);
+    let loading = $state(true);
+    
+    onMount(async () => {
+        setTimeout(() => isLoaded = true, 100);
+        if (user?.id) {
+            await loadTransactions();
+        }
+    });
 
-    let transactions = [
-        { id: 1, type: 'purchase', description: 'Pinte Blonde', amount: -350, date: '07/01/2026', perm: 'Soirée Inté', quantity: 1, product: 'Chouffe' },
-        { id: 2, type: 'purchase', description: 'Snack', amount: -150, date: '07/01/2026', perm: 'Perm Midi', quantity: 1, product: 'Chips' },
-        { id: 3, type: 'recharge', description: 'Rechargement CB', amount: 2000, date: '05/01/2026', perm: 'Bureau', quantity: 1, product: 'Recharge' },
-        { id: 4, type: 'purchase', description: 'Pinte Rouge', amount: -400, date: '04/01/2026', perm: 'Soirée Noel', quantity: 2, product: 'Kasteel Rouge' },
-    ];
-
-    function formatCurrency(cents: number) {
-        return (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+    async function loadTransactions() {
+        try {
+            const res = await fetch(`/api/transactions?userId=${user.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                // Transformer les transactions pour le format d'affichage
+                transactions = data.map((t: any) => ({
+                    id: t.id,
+                    type: t.type === 'R' ? 'recharge' : 'purchase',
+                    description: getTransactionDescription(t),
+                    amount: t.prix,
+                    date: new Date(t.date * 1000).toLocaleDateString('fr-FR'),
+                    perm: t.perm_nom || 'Système',
+                    product: getItemName(t)
+                }));
+            }
+        } catch (e) {
+            console.error('Erreur chargement transactions:', e);
+        } finally {
+            loading = false;
+        }
     }
+
+    function getTransactionDescription(t: any) {
+        if (t.type === 'R') return 'Rechargement';
+        if (t.type === 'B') return 'Boisson';
+        if (t.type === 'C') return 'Consommable';
+        return 'Transaction';
+    }
+
+    function getItemName(t: any) {
+        if (t.type === 'R') return 'Recharge';
+        if (t.type === 'B') return `${t.boisson_nom || '?'} ${t.contenant_nom || ''}`;
+        if (t.type === 'C') return t.consommable_nom || '?';
+        return `Item #${t.id_item || '?'}`;
+    }
+
 </script>
 
-<div class="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
+<PageBackground variant="minimal" />
+
+<div class="max-w-4xl mx-auto px-4 pt-24 pb-32 md:pb-8 space-y-8 transition-all duration-700 {isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}">
     
-    <!-- Profile Header -->
-    <div class="bg-bg-card rounded-2xl p-6 shadow-sm border border-brand-red/10 flex flex-col md:flex-row items-center gap-6">
-        <div class="w-24 h-24 rounded-full bg-brand-yellow text-brand-dark flex items-center justify-center text-3xl font-bold border-4 border-bg-secondary">
-            {user.firstname[0]}{user.lastname[0]}
-        </div>
-        <div class="text-center md:text-left flex-1">
-            <h1 class="text-2xl font-bold">{user.firstname} {user.lastname}</h1>
-            <p class="text-text-muted">{user.email}</p>
-            <span class="inline-block mt-2 px-3 py-1 bg-brand-red/10 text-brand-red rounded-full text-xs font-bold uppercase tracking-wide">
-                {user.role}
-            </span>
-        </div>
-        <div class="bg-brand-dark text-white p-6 rounded-xl min-w-[200px] text-center">
-            <div class="text-sm opacity-80 mb-1">Solde actuel</div>
-            <div class="text-3xl font-bold text-brand-yellow">{formatCurrency(user.balance)}</div>
-        </div>
-    </div>
-
-    <!-- Actions Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <button class="bg-brand-red hover:bg-red-700 text-white p-4 rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 h-16">
-            <Icon name="PlusCircle" />
-            Recharger mon compte
-        </button>
-        <button class="bg-bg-card hover:bg-bg-secondary text-text-primary border border-border p-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 h-16">
-            <Icon name="Settings" />
-            Paramètres
-        </button>
-    </div>
-
-    <!-- History -->
-    <div class="bg-bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-        <div class="p-6 border-b border-border flex flex-col md:flex-row justify-between items-center gap-4">
-            <h2 class="font-bold text-xl">Historique</h2>
+    <!-- User Header & Balance -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Identity Card -->
+        <div class="lg:col-span-2 relative overflow-hidden rounded-[2rem] bg-bg-card border border-white/5 p-8 group">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-brand-red/10 rounded-full blur-3xl -mr-16 -mt-16 transition-transform group-hover:scale-150"></div>
             
-            <!-- Date Filters (Placeholder UI) -->
-            <div class="flex items-center gap-2 text-sm bg-bg-secondary/50 p-1 rounded-lg">
-                <input type="date" class="bg-transparent border-none outline-none text-text-muted px-2" value="2026-01-01">
-                <span class="text-text-muted">à</span>
-                <input type="date" class="bg-transparent border-none outline-none text-text-muted px-2" value="2026-01-31">
+            <div class="relative z-10 flex items-center gap-6">
+                <!-- Avatar -->
+                <div class="relative shrink-0">
+                    <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 bg-bg-tertiary">
+                         <img 
+                            src={getAvatarUrl(user?.firstname || '?', user?.lastname || '?', user?.photo_url)} 
+                            alt="Avatar" 
+                            class="w-full h-full object-cover"
+                        />
+                    </div>
+                    <div class="absolute -bottom-1 -right-1 bg-bg-card p-1 rounded-full border border-white/5">
+                        <div class="bg-success w-4 h-4 rounded-full border-2 border-bg-card"></div>
+                    </div>
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                         <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-brand-red/10 text-brand-red text-[10px] font-bold uppercase tracking-widest border border-brand-red/20">
+                            <Icon name="Shield" size={10} />
+                            {user?.role || 'Membre'}
+                         </span>
+                    </div>
+                    <h1 class="text-3xl font-bold truncate text-text-primary">
+                        {user?.firstname} {user?.lastname}
+                    </h1>
+                    <p class="text-text-muted text-sm truncate">{user?.login || user?.mail} · {user?.promo || 'Non renseigné'}</p>
+                </div>
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-bg-secondary/50 text-text-muted text-sm border-b border-border">
-                        <th class="p-4 font-medium">Date</th>
-                        <th class="p-4 font-medium">Perm</th>
-                        <th class="p-4 font-medium">Produit</th>
-                        <th class="p-4 font-medium text-center">Qté</th>
-                        <th class="p-4 font-medium text-right">Montant</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    {#each transactions as tx}
-                        <tr class="hover:bg-bg-secondary/20 transition-colors">
-                            <td class="p-4 text-sm text-text-muted font-mono">{tx.date}</td>
-                            <td class="p-4 font-medium">{tx.perm}</td>
-                            <td class="p-4 flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full flex items-center justify-center {tx.type === 'recharge' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-brand-red'}">
-                                    <Icon name={tx.type === 'recharge' ? 'ArrowDownLeft' : 'Beer'} size={12} />
-                                </div>
-                                {tx.product}
-                            </td>
-                            <td class="p-4 text-center text-text-muted">{tx.quantity}</td>
-                            <td class="p-4 text-right font-bold font-mono {tx.amount > 0 ? 'text-green-600' : 'text-text-primary'}">
-                                {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
-                            </td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
+        <!-- Wallet Card -->
+        <div class="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-yellow to-yellow-600 p-8 shadow-lg shadow-brand-yellow/20 group cursor-pointer transition-transform hover:scale-[1.02]">
+             <div class="absolute -right-4 -top-4 opacity-20 text-black group-hover:rotate-12 transition-transform duration-500">
+                <Icon name="Beer" size={80} />
+             </div>
+             
+             <div class="relative z-10 flex flex-col justify-between h-full space-y-8">
+                 <div>
+                    <div class="text-[10px] font-black uppercase tracking-widest text-black/60 mb-2">Solde Actuel</div>
+                    <div class="text-5xl font-black text-black tracking-tighter">
+                        {formatCurrency(user?.solde || 0)}
+                    </div>
+                 </div>
+                 
+                 <div class="flex justify-between items-end">
+                    <div class="text-black/50 text-xs font-mono">
+                        ID: {user?.id || '---'}
+                    </div>
+                 </div>
+             </div>
         </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-2 gap-4">
+        <a href="/recharge" class="flex items-center justify-center gap-3 p-6 rounded-3xl bg-brand-red text-white font-bold uppercase tracking-widest text-sm shadow-xl shadow-brand-red/20 hover:bg-brand-red-hover transition-all active:scale-95 group">
+            <Icon name="PlusCircle" class="group-hover:rotate-90 transition-transform" />
+            Recharger
+        </a>
+        <button class="flex items-center justify-center gap-3 p-6 rounded-3xl bg-bg-card border border-white/5 text-text-primary font-bold uppercase tracking-widest text-sm hover:bg-bg-secondary transition-all active:scale-95">
+            <Icon name="History" />
+            Historique
+        </button>
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Recent Transactions -->
+         <div class="lg:col-span-2 space-y-6">
+            <div class="flex items-center justify-between px-2">
+                <h2 class="text-lg font-bold uppercase tracking-widest text-text-muted">Dernières Soifs</h2>
+                <button class="text-xs font-bold text-brand-red uppercase tracking-widest hover:underline">Tout voir</button>
+            </div>
+
+            <div class="space-y-4">
+                {#if loading}
+                    <div class="flex items-center justify-center py-12">
+                        <Icon name="Loader2" class="animate-spin text-brand-red" size={32} />
+                    </div>
+                {:else if transactions.length === 0}
+                    <div class="text-center py-12">
+                        <div class="text-text-muted mb-2">
+                            <Icon name="Inbox" size={48} class="mx-auto opacity-50" />
+                        </div>
+                        <p class="text-text-muted">Aucune transaction pour le moment</p>
+                    </div>
+                {:else}
+                    {#each transactions as tx (tx.id)}
+                        <div class="flex items-center gap-4 p-4 rounded-2xl bg-bg-card border border-white/5 hover:border-white/10 transition-colors group">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 {tx.amount > 0 ? 'bg-success/10 text-success' : 'bg-brand-red/10 text-brand-red'}">
+                                <Icon name={tx.amount > 0 ? 'Plus' : 'Beer'} size={20} />
+                            </div>
+                            
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between mb-1">
+                                    <h3 class="font-bold text-text-primary truncate">{tx.product}</h3>
+                                    <span class="font-bold {tx.amount > 0 ? 'text-success' : 'text-text-primary'}">
+                                        {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
+                                    </span>
+                                </div>
+                                <div class="flex items-center justify-between text-xs text-text-muted">
+                                    <span>{tx.perm}</span>
+                                    <span>{tx.date}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                {/if}
+            </div>
+         </div>
+
+         <!-- Statistics / Badges (Placeholder) -->
+         <div class="space-y-6">
+             <div class="flex items-center justify-between px-2">
+                <h2 class="text-lg font-bold uppercase tracking-widest text-text-muted">Trophées</h2>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="aspect-square rounded-2xl bg-bg-card border border-white/5 flex flex-col items-center justify-center gap-3 p-4 text-center grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-not-allowed">
+                    <Icon name="Trophy" size={32} class="text-brand-yellow" />
+                    <span class="text-xs font-bold text-text-secondary">Pilier de Bar</span>
+                </div>
+                 <div class="aspect-square rounded-2xl bg-bg-card border border-white/5 flex flex-col items-center justify-center gap-3 p-4 text-center grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-not-allowed">
+                    <Icon name="Flame" size={32} class="text-brand-red" />
+                    <span class="text-xs font-bold text-text-secondary">Série en cours</span>
+                </div>
+            </div>
+         </div>
     </div>
 </div>

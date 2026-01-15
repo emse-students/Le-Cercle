@@ -27,22 +27,34 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/admin" | "/api" | "/api/boissons" | "/api/consommables" | "/api/perms" | "/api/perms/active" | "/api/recharge" | "/api/status" | "/api/transactions" | "/api/users" | "/dev" | "/dev/login-as" | "/dev/logout" | "/dev/recharge" | "/open-perm" | "/profile" | "/recharge" | "/serve";
+		RouteId(): "/" | "/admin" | "/api" | "/api/boissons" | "/api/boissons/[id]" | "/api/consommables" | "/api/consommables/[id]" | "/api/perms" | "/api/perms/active" | "/api/perms/[id]" | "/api/perms/[id]/carte" | "/api/perms/[id]/stats" | "/api/recharge" | "/api/status" | "/api/transactions" | "/api/users" | "/api/users/[id]" | "/carte" | "/dev" | "/dev/login-as" | "/dev/logout" | "/dev/recharge" | "/open-perm" | "/profile" | "/recharge" | "/serve";
 		RouteParams(): {
-			
+			"/api/boissons/[id]": { id: string };
+			"/api/consommables/[id]": { id: string };
+			"/api/perms/[id]": { id: string };
+			"/api/perms/[id]/carte": { id: string };
+			"/api/perms/[id]/stats": { id: string };
+			"/api/users/[id]": { id: string }
 		};
 		LayoutParams(): {
-			"/": Record<string, never>;
+			"/": { id?: string };
 			"/admin": Record<string, never>;
-			"/api": Record<string, never>;
-			"/api/boissons": Record<string, never>;
-			"/api/consommables": Record<string, never>;
-			"/api/perms": Record<string, never>;
+			"/api": { id?: string };
+			"/api/boissons": { id?: string };
+			"/api/boissons/[id]": { id: string };
+			"/api/consommables": { id?: string };
+			"/api/consommables/[id]": { id: string };
+			"/api/perms": { id?: string };
 			"/api/perms/active": Record<string, never>;
+			"/api/perms/[id]": { id: string };
+			"/api/perms/[id]/carte": { id: string };
+			"/api/perms/[id]/stats": { id: string };
 			"/api/recharge": Record<string, never>;
 			"/api/status": Record<string, never>;
 			"/api/transactions": Record<string, never>;
-			"/api/users": Record<string, never>;
+			"/api/users": { id?: string };
+			"/api/users/[id]": { id: string };
+			"/carte": Record<string, never>;
 			"/dev": Record<string, never>;
 			"/dev/login-as": Record<string, never>;
 			"/dev/logout": Record<string, never>;
@@ -52,7 +64,7 @@ declare module "$app/types" {
 			"/recharge": Record<string, never>;
 			"/serve": Record<string, never>
 		};
-		Pathname(): "/" | "/admin" | "/admin/" | "/api" | "/api/" | "/api/boissons" | "/api/boissons/" | "/api/consommables" | "/api/consommables/" | "/api/perms" | "/api/perms/" | "/api/perms/active" | "/api/perms/active/" | "/api/recharge" | "/api/recharge/" | "/api/status" | "/api/status/" | "/api/transactions" | "/api/transactions/" | "/api/users" | "/api/users/" | "/dev" | "/dev/" | "/dev/login-as" | "/dev/login-as/" | "/dev/logout" | "/dev/logout/" | "/dev/recharge" | "/dev/recharge/" | "/open-perm" | "/open-perm/" | "/profile" | "/profile/" | "/recharge" | "/recharge/" | "/serve" | "/serve/";
+		Pathname(): "/" | "/admin" | "/admin/" | "/api" | "/api/" | "/api/boissons" | "/api/boissons/" | `/api/boissons/${string}` & {} | `/api/boissons/${string}/` & {} | "/api/consommables" | "/api/consommables/" | `/api/consommables/${string}` & {} | `/api/consommables/${string}/` & {} | "/api/perms" | "/api/perms/" | "/api/perms/active" | "/api/perms/active/" | `/api/perms/${string}` & {} | `/api/perms/${string}/` & {} | `/api/perms/${string}/carte` & {} | `/api/perms/${string}/carte/` & {} | `/api/perms/${string}/stats` & {} | `/api/perms/${string}/stats/` & {} | "/api/recharge" | "/api/recharge/" | "/api/status" | "/api/status/" | "/api/transactions" | "/api/transactions/" | "/api/users" | "/api/users/" | `/api/users/${string}` & {} | `/api/users/${string}/` & {} | "/carte" | "/carte/" | "/dev" | "/dev/" | "/dev/login-as" | "/dev/login-as/" | "/dev/logout" | "/dev/logout/" | "/dev/recharge" | "/dev/recharge/" | "/open-perm" | "/open-perm/" | "/profile" | "/profile/" | "/recharge" | "/recharge/" | "/serve" | "/serve/";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/logo.png" | string & {};
 	}

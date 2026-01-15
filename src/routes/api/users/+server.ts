@@ -100,7 +100,7 @@ export const PUT: RequestHandler = async (event) => {
 			if (!user) {
 				return json({ error: 'User not found' }, { status: 404 });
 			}
-			
+
 			const stmt = db.prepare(`
 				UPDATE users 
 				SET login = ?, mail = ?, prenom = ?, nom = ?, promo = ?
@@ -115,7 +115,7 @@ export const PUT: RequestHandler = async (event) => {
 				data.id
 			);
 		}
-		
+
 		if (data.role !== undefined) {
 			updateUserRole(data.id, data.role);
 		}
@@ -125,7 +125,7 @@ export const PUT: RequestHandler = async (event) => {
 		if (data.solde !== undefined) {
 			updateUserSolde(data.id, data.solde);
 		}
-		
+
 		return json({ success: true });
 	} catch (err: unknown) {
 		return json({ error: (err as Error).message }, { status: 500 });
@@ -137,7 +137,7 @@ export const DELETE: RequestHandler = async (event) => {
 	requireCercleux(event);
 
 	const userId = event.url.searchParams.get('id');
-	
+
 	if (!userId) {
 		return json({ error: 'Missing user ID' }, { status: 400 });
 	}

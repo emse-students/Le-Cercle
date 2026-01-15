@@ -1,19 +1,28 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+
+// Créer le dossier data s'il n'existe pas
+if (!existsSync('data')) {
+	mkdirSync('data', { recursive: true });
+}
 
 const db = new Database('data/le_cercle.db');
 
-// Enable WAL mode for concurrency
-db.pragma('journal_mode = WAL');
+// Mode journal simple (un seul fichier .db)
+db.pragma('journal_mode = DELETE');
+db.pragma('foreign_keys = ON');
 
-// Initialize schema
+// Initialisation du schéma
 try {
 	const schema = readFileSync(join(process.cwd(), 'src', 'lib', 'db', 'schema.sql'), 'utf-8');
 	db.exec(schema);
-	console.debug('Database schema initialized.');
+
+	// Données initiales (cotisations)
+	const seed = readFileSync(join(process.cwd(), 'src', 'lib', 'db', 'seed.sql'), 'utf-8');
+	db.exec(seed);
 } catch (err) {
-	console.error('Failed to initialize database schema:', err);
+	console.error('Erreur initialisation base de données:', err);
 }
 
 export default db;

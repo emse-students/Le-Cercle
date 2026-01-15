@@ -1,1 +1,1 @@
-export { default as component } from "../../../../src/routes/open-perm/+page.svelte";
+export { default as component } from "../../../../src/routes/carte/+page.svelte";

@@ -3,14 +3,19 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { error } from '@sveltejs/kit';
 
 export type UserRole = 'user' | 'cercleux';
+export type StatutCotisation = 'non_cotisant' | 'cotisant_sans_alcool' | 'cotisant_avec_alcool';
 
 export interface AuthUser {
-    id: number;
-    login: string;
-    firstname: string;
-    lastname: string;
-    role: UserRole;
-    solde: number;
+	id: number;
+	login: string;
+	mail: string;
+	firstname: string;
+	lastname: string;
+	promo: number;
+	role: UserRole;
+	statut_cotisation: StatutCotisation;
+	solde: number;
+	photo_url?: string | null;
 }
 
 /**
@@ -41,6 +46,33 @@ export function requireCercleux(event: RequestEvent): AuthUser {
 		throw error(403, 'Accès réservé aux administrateurs');
 	}
 	return user;
+}
+
+/**
+ * Require cotisant status (avec ou sans alcool)
+ */
+export function requireCotisant(event: RequestEvent): AuthUser {
+	const user = requireAuth(event);
+	if (
+		user.statut_cotisation !== 'cotisant_avec_alcool' &&
+		user.statut_cotisation !== 'cotisant_sans_alcool'
+	) {
+		throw error(403, 'Accès réservé aux cotisants');
+	}
+	return user;
+}
+
+/**
+ * Check if user is cotisant
+ */
+export function isCotisant(user: AuthUser | null): boolean {
+	if (!user) {
+		return false;
+	}
+	return (
+		user.statut_cotisation === 'cotisant_avec_alcool' ||
+		user.statut_cotisation === 'cotisant_sans_alcool'
+	);
 }
 
 /**

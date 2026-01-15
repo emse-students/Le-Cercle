@@ -126,7 +126,6 @@ export default [
 			'scripts/**/*.mjs',
 			'src/**/*.svelte',
 			'**/.svelte-kit/**',
-			'static/streamsaver-sw.js',
             '**/*.timestamp-*.mjs'
 		]
 	}
