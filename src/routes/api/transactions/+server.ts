@@ -54,7 +54,11 @@ export const POST: RequestHandler = async (event) => {
 	const data = (await event.request.json()) as CreateTransactionDTO;
 	const { userId, permId, type, itemId, quantity, price } = data;
 
-	if (!userId || !permId || !type || !itemId || !quantity) {
+	// permId is optional (Hors Perm)
+	// If permId is provided, check access.
+	// If permId is NOT provided, check if user is cercleux (Admin only).
+
+	if (!userId || !type || !itemId || !quantity) {
 		return json({ error: 'Missing required fields' }, { status: 400 });
 	}
 
@@ -62,17 +66,24 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Invalid transaction type' }, { status: 400 });
 	}
 
-	// Vérifier que le serveur peut encaisser dans cette perm
-	const hasAccess = await checkServeurPermAccess(serveur.id, permId);
-	if (!hasAccess && serveur.role !== 'cercleux') {
-		return json({ error: 'Vous ne pouvez pas encaisser dans cette perm' }, { status: 403 });
+	if (permId) {
+		// Vérifier que le serveur peut encaisser dans cette perm
+		const hasAccess = await checkServeurPermAccess(serveur.id, permId);
+		if (!hasAccess && serveur.role !== 'cercleux') {
+			return json({ error: 'Vous ne pouvez pas encaisser dans cette perm' }, { status: 403 });
+		}
+	} else {
+		// Hors perm: Seul les admins peuvent
+		if (serveur.role !== 'cercleux') {
+			return json({ error: 'Seuls les admins peuvent encaisser hors perm' }, { status: 403 });
+		}
 	}
 
 	try {
 		const result = createTransaction({
 			id_user: userId,
 			id_debiteur: serveur.id,
-			id_perm: permId,
+			id_perm: permId || null,
 			type,
 			id_item: itemId,
 			date: Math.floor(Date.now() / 1000),

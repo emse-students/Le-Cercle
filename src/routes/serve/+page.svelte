@@ -5,6 +5,9 @@
 	import UserSearch from '$lib/components/UserSearch.svelte';
 	import ItemSelector from '$lib/components/ItemSelector.svelte';
 	import { fade, fly } from 'svelte/transition';
+	import type { PageData } from './$types';
+
+	let { data }: { data: PageData } = $props();
 
 	let activePerm = $state<any>(null);
 	let selectedUser = $state<any>(null);
@@ -15,11 +18,19 @@
 	let error = $state('');
 	let lastSuccess = $state<{ user: string; item: string } | null>(null);
 
+	// Derived state for permissions and mode
+	let isCercleux = $derived(data.user?.role === 'cercleux');
+	let isHorsPerm = $derived(!activePerm && isCercleux);
+
 	onMount(async () => {
 		try {
 			const res = await fetch('/api/perms/active');
 			if (res.ok) {
-				activePerm = await res.json();
+				const perm = await res.json();
+				// API returns empty object or null if no active perm?
+				// Usually returns 200 with content or 204 or 404.
+				// Assuming it returns null or the perm object.
+				activePerm = perm && perm.id ? perm : null;
 				if (activePerm) loadTransactions();
 			}
 		} catch (e) {
@@ -30,7 +41,15 @@
 	});
 
 	async function loadTransactions() {
-		if (!activePerm) return;
+		// If Hors Perm, maybe we don't load history, or we need a special endpoint?
+		// getPermTransactions requires permId.
+		// getUserTransactions requires userId.
+		// We don't have a "getRecentGlobalTransactions" public endpoint.
+		// For now, only load history if activePerm.
+		if (!activePerm) {
+			transactions = [];
+			return;
+		}
 		try {
 			const res = await fetch(`/api/transactions?permId=${activePerm.id}&limit=10`);
 			if (res.ok) transactions = await res.json();
@@ -50,14 +69,7 @@
 			const res = await fetch(`/api/perms/${activePerm.id}/carte`);
 			if (res.ok) {
 				const carte = await res.json();
-				// Transform { type, id_item, detail } -> detail (which contains full item info)
-				// Filter by type if needed, but ItemSelector filters by type prop.
-				// Actually ItemSelector expects a list of items to show.
-				// We should pass "all items allowed" and let ItemSelector filter by type?
-				// ItemSelector filters by type using separate endpoints usually.
-				// If we pass 'items' prop, we should pass ONLY the items of the selected type.
-
-				// Let's store full carte and filter in the template
+				// Transform { type, id_item, detail } -> detail
 				carteItems = carte.map((c: any) => ({
 					...c.detail,
 					type: c.type === 'B' ? 'boisson' : 'consommable'
@@ -69,9 +81,9 @@
 	}
 
 	async function handleTransaction(item: any, quantity: number) {
-		if (!selectedUser || !activePerm) return;
+		if (!selectedUser) return;
+		if (!activePerm && !isHorsPerm) return;
 
-		// Optimistic UI could be done here, but let's wait for server for safety
 		loading = true;
 
 		try {
@@ -80,11 +92,11 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					userId: selectedUser.id,
-					permId: activePerm.id,
+					permId: activePerm?.id || null, // Optional if Hors Perm
 					itemId: item.id,
 					quantity: quantity,
-					price: item.prix_vente, // Pass price
-					type: selectedType === 'boisson' ? 'B' : 'C' // Pass type
+					price: item.prix_vente,
+					type: selectedType === 'boisson' ? 'B' : 'C'
 				})
 			});
 
@@ -96,11 +108,13 @@
 				await loadTransactions();
 				selectedUser = null;
 			} else {
-				error = 'Erreur transaction';
+				const err = await res.json();
+				error = err.error || 'Erreur transaction';
 				setTimeout(() => (error = ''), 3000);
 			}
 		} catch (e) {
 			error = 'Erreur réseau';
+			setTimeout(() => (error = ''), 3000);
 		} finally {
 			loading = false;
 		}
@@ -113,12 +127,25 @@
 
 <PageBackground variant="minimal" />
 
+{#if error}
+	<div
+		class="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-error text-white px-6 py-4 rounded-xl shadow-2xl animate-bounce font-bold border-2 border-white/20"
+		in:fly={{ y: -50 }}
+		out:fade
+	>
+		<div class="flex items-center gap-3">
+			<Icon name="AlertCircle" size={24} />
+			{error}
+		</div>
+	</div>
+{/if}
+
 <div class="min-h-screen pt-20 pb-32 md:pb-10 px-4 md:px-8 max-w-[1800px] mx-auto">
 	{#if serverLoading}
 		<div class="flex items-center justify-center h-64 text-rose-500">
 			<Icon name="Loader2" class="animate-spin" size={48} />
 		</div>
-	{:else if !activePerm}
+	{:else if !activePerm && !isHorsPerm}
 		<div class="text-center mt-20">
 			<div class="inline-block p-6 rounded-full bg-slate-800 text-slate-500 mb-6">
 				<Icon name="Store" size={64} />
@@ -135,24 +162,41 @@
 			</a>
 		</div>
 	{:else}
+		<!-- Active Perm OR Hors Perm -->
 		<div class="flex flex-col xl:flex-row gap-8 h-[calc(100vh-8rem)]">
 			<!-- LEFT PANEL: SERVICE -->
 			<div class="flex-1 flex flex-col gap-6">
 				<!-- Header Info -->
 				<div
-					class="flex items-center justify-between bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-md"
+					class="flex items-center justify-between border p-4 rounded-2xl backdrop-blur-md transition-colors
+                    {isHorsPerm
+						? 'bg-orange-500/10 border-orange-500/30'
+						: 'bg-white/5 border-white/10'}"
 				>
 					<div class="flex items-center gap-4">
 						<div
-							class="w-12 h-12 bg-emerald-500/20 text-emerald-500 rounded-xl flex items-center justify-center"
+							class="w-12 h-12 rounded-xl flex items-center justify-center
+                            {isHorsPerm
+								? 'bg-orange-500/20 text-orange-500'
+								: 'bg-emerald-500/20 text-emerald-500'}"
 						>
-							<Icon name="Store" size={24} />
+							<Icon name={isHorsPerm ? 'ShieldAlert' : 'Store'} size={24} />
 						</div>
 						<div>
-							<h2 class="font-bold text-white text-lg">{activePerm.nom}</h2>
-							<div class="flex items-center gap-2 text-xs font-mono text-emerald-400">
-								<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-								EN COURS
+							<h2 class="font-bold text-white text-lg">
+								{isHorsPerm ? 'SERVICE HORS PERM' : activePerm.nom}
+							</h2>
+							<div
+								class="flex items-center gap-2 text-xs font-mono {isHorsPerm
+									? 'text-orange-400'
+									: 'text-emerald-400'}"
+							>
+								<span
+									class="w-2 h-2 rounded-full animate-pulse {isHorsPerm
+										? 'bg-orange-500'
+										: 'bg-emerald-500'}"
+								></span>
+								{isHorsPerm ? 'MODE ADMIN' : 'EN COURS'}
 							</div>
 						</div>
 					</div>
@@ -251,13 +295,31 @@
 								</button>
 							</div>
 
-							<ItemSelector
-								type={selectedType}
-								onSelect={handleTransaction}
-								items={carteItems.filter((i) =>
-									selectedType === 'boisson' ? i.type === 'boisson' : i.type === 'consommable'
-								)}
-							/>
+							<!-- Carte Filtering Logic & UI -->
+							{@const currentCarteItems = activePerm
+								? carteItems.filter((i) =>
+										selectedType === 'boisson' ? i.type === 'boisson' : i.type === 'consommable'
+									)
+								: []}
+
+							{#if activePerm && currentCarteItems.length === 0}
+								<div class="text-center py-10 bg-white/5 rounded-2xl border border-white/10 border-dashed">
+									<Icon name="Slash" class="mb-4 mx-auto text-slate-500" size={32} />
+									<h3 class="text-lg font-bold text-white">La carte est vide</h3>
+									<p class="text-sm text-slate-400 mb-4">
+										Aucun item de ce type n'a été ajouté à cette perm.
+									</p>
+									{#if isCercleux}
+										<a href="/admin" class="text-rose-400 hover:underline">Gérer la carte dans l'admin</a>
+									{/if}
+								</div>
+							{:else}
+								<ItemSelector
+									type={selectedType}
+									onSelect={handleTransaction}
+									items={activePerm ? currentCarteItems : []}
+								/>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -295,22 +357,27 @@
 								<div
 									class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400"
 								>
-									{tx.userName ? tx.userName[0] : '?'}
+									{tx.user_prenom ? tx.user_prenom[0] : '?'}
 								</div>
 								<div>
-									<div class="font-bold text-slate-200 text-sm">{tx.itemName || 'Transaction'}</div>
+									<div class="font-bold text-slate-200 text-sm">
+										{tx.boisson_nom || tx.consommable_nom || 'Transaction'}
+									</div>
 									<div class="text-[10px] text-slate-500">
-										{tx.userName || 'Inconnu'} • {tx.created_at
-											? new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+										{tx.user_prenom || 'Inconnu'} • {tx.date
+											? new Date(tx.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 											: ''}
 									</div>
 								</div>
 							</div>
 							<div class="font-mono text-white font-bold text-sm">
-								{tx.amount ? tx.amount.toFixed(2) : '0.00'}€
+								{tx.prix ? Math.abs(tx.prix).toFixed(2) : '0.00'}€
 							</div>
 						</div>
 					{/each}
+					{#if transactions.length === 0}
+						<div class="text-center py-10 opacity-50 text-sm">Aucune transaction récente</div>
+					{/if}
 				</div>
 			</div>
 		</div>

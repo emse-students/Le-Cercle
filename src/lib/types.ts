@@ -79,7 +79,7 @@ export interface Transaction {
     id: number;
     id_user: number;
     id_debiteur: number;
-    id_perm: number;
+    id_perm: number | null;
     type: 'B' | 'C' | 'A'; // Boisson, Consommable, Autre
     id_item: number;
     date: number; // Unix timestamp
