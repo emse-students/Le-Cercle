@@ -58,7 +58,7 @@ export const PATCH: RequestHandler = async (event) => {
 		if (dose_ml !== undefined && dose_ml !== null) {
 			const boisson = getBoissonById(id);
 			if (boisson?.id_contenant) {
-				db.prepare('UPDATE contenants SET capacite = ? WHERE id = ?').run(dose_ml / 1000, boisson.id_contenant);
+				db.prepare('UPDATE contenants SET capacite_ml = ? WHERE id = ?').run(dose_ml, boisson.id_contenant);
 			}
 		}
 

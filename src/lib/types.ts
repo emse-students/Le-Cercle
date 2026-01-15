@@ -24,8 +24,8 @@ export interface Contenu {
 export interface Contenant {
     id: number;
     nom: string;
-    capacite: number; // Litres
-    type: 'fut' | 'bouteille_unique' | 'bouteille_partage' | 'cubi' | 'verre';
+    capacite_ml: number; // mL
+    type: 'fut' | 'bouteille_unique' | 'bouteille_partage' | 'cubi' | 'verre' | 'canette' | 'unite';
 }
 
 export interface Boisson {
@@ -45,7 +45,8 @@ export interface Boisson {
     contenu_nom?: string;
     contenu_degre?: number;
     contenant_nom?: string;
-    contenant_capacite?: number;
+    contenant_capacite?: number; // Nom gardé pour compatibilité mais mappé à capacite_ml
+    contenant_capacite_ml?: number;
     contenant_type?: string;
 }
 
@@ -55,6 +56,7 @@ export interface Consommable {
     prix_vente: number;
     prix_achat: number;
     stock: number;
+    volume_ml: number;
     icone: string;
     description?: string;
 }

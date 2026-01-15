@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS contenus (
 CREATE TABLE IF NOT EXISTS contenants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
-    capacite REAL NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('fut', 'cubi', 'bouteille_unique', 'bouteille_partage', 'verre'))
+    capacite_ml REAL NOT NULL, -- Volume en mL pour précision
+    type TEXT NOT NULL CHECK(type IN ('fut', 'cubi', 'bouteille_unique', 'bouteille_partage', 'verre', 'canette', 'unite'))
 );
 
 -- Boissons
@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS consommables (
     prix_vente REAL NOT NULL,
     prix_achat REAL NOT NULL DEFAULT 0.0,
     stock INTEGER NOT NULL DEFAULT 0,
+    volume_ml REAL NOT NULL DEFAULT 0.0, -- Pour le calcul Qualité/Cuite si applicable
     icone TEXT NOT NULL DEFAULT 'Utensils',
     description TEXT
 );

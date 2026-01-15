@@ -141,9 +141,19 @@ export function getPermTransactions(permId: number): Transaction[] {
 	return db.prepare(`
         SELECT 
             t.*,
-            u.prenom as user_prenom, u.nom as user_nom
+            u.prenom as user_prenom, u.nom as user_nom,
+            -- Boisson Info
+            co.nom as boisson_nom, co.degre as boisson_degre,
+            ct.nom as contenant_nom, ct.capacite_ml as contenant_capacite,
+            b.prix_achat as boisson_prix_achat, b.icone as boisson_icone,
+            -- Consommable info
+            con.nom as consommable_nom, con.prix_achat as consommable_prix_achat, con.icone as consommable_icone, con.volume_ml as consommable_volume
         FROM transactions t
         JOIN users u ON t.id_user = u.id
+        LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
+        LEFT JOIN contenus co ON b.id_contenu = co.id
+        LEFT JOIN contenants ct ON b.id_contenant = ct.id
+        LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
         WHERE t.id_perm = ?
         ORDER BY t.date DESC
     `).all(permId) as Transaction[];
@@ -169,6 +179,27 @@ export function createTransaction(transaction: Omit<Transaction, 'id'>) {
 	const user = getUserById(transaction.id_user);
 	if (user) {
 		updateUserSolde(transaction.id_user, user.solde + transaction.prix);
+	}
+
+	// Mettre à jour le total de la permanence si applicable
+	if (transaction.id_perm) {
+		const prixAbs = Math.abs(transaction.prix);
+		let volumeAbs = 0;
+
+		// Si c'est une boisson, on peut essayer de mettre à jour le volume consommé si c'est pertinent
+		if (transaction.type === 'B') {
+			const boisson = getBoissonById(transaction.id_item);
+			if (boisson && boisson.contenant_capacite) {
+				volumeAbs = transaction.nb * boisson.contenant_capacite;
+			}
+		}
+
+		db.prepare(`
+            UPDATE perms 
+            SET total_vente = total_vente + ?, 
+                total_litre = total_litre + ? 
+            WHERE id = ?
+        `).run(prixAbs, volumeAbs, transaction.id_perm);
 	}
 
 	return result;
@@ -244,21 +275,27 @@ export function getAllContenants(): Contenant[] {
 
 export function createContenant(contenant: Omit<Contenant, 'id'>) {
 	const stmt = db.prepare(`
-        INSERT INTO contenants (nom, capacite, type)
+        INSERT INTO contenants (nom, capacite_ml, type)
         VALUES (?, ?, ?)
     `);
-	return stmt.run(contenant.nom, contenant.capacite, contenant.type);
+	return stmt.run(contenant.nom, contenant.capacite_ml, contenant.type);
 }
 
 // ========== PERMS ==========
 
 export function getAllPerms(): Perm[] {
 	return db.prepare(`
-        SELECT p.*, n.nom, n.annee, n.is_active as is_open
+        SELECT 
+            p.*, n.nom, n.annee, n.is_active as is_open,
+            (SELECT SUM(ABS(t.prix) - (t.nb * COALESCE(b.prix_achat, con.prix_achat, 0))) 
+             FROM transactions t 
+             LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
+             LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
+             WHERE t.id_perm = p.id AND t.type IN ('B', 'C')) as total_profit
         FROM perms p
         JOIN noms_perms n ON p.id_nom_perm = n.id
         ORDER BY p.date DESC
-    `).all() as Perm[];
+    `).all() as (Perm & { total_profit: number })[];
 }
 
 export function getActivePerm(): Perm | undefined {
@@ -290,7 +327,7 @@ export function getAllBoissons(): Boisson[] {
         SELECT 
             b.*,
             c.nom as contenu_nom, c.degre as contenu_degre, c.type as contenu_type, c.description as contenu_description,
-            ct.nom as contenant_nom, ct.capacite as contenant_capacite, ct.type as contenant_type
+            ct.nom as contenant_nom, ct.capacite_ml as contenant_capacite, ct.type as contenant_type
         FROM boissons b
         JOIN contenus c ON b.id_contenu = c.id
         JOIN contenants ct ON b.id_contenant = ct.id
@@ -303,7 +340,7 @@ export function getBoissonById(id: number): Boisson | undefined {
         SELECT 
             b.*,
             c.nom as contenu_nom, c.degre as contenu_degre, c.description as contenu_description,
-            ct.nom as contenant_nom, ct.capacite as contenant_capacite, ct.type as contenant_type
+            ct.nom as contenant_nom, ct.capacite_ml as contenant_capacite, ct.type as contenant_type
         FROM boissons b
         JOIN contenus c ON b.id_contenu = c.id
         JOIN contenants ct ON b.id_contenant = ct.id
@@ -371,6 +408,22 @@ export function updateBoisson(id: number, boisson: Partial<Boisson>) {
 	return db.prepare(`UPDATE boissons SET ${fields.join(', ')} WHERE id = ?`).run(...values);
 }
 
+export function deleteBoisson(id: number) {
+    // Check dependencies...
+    // For now, if it's in a transaction or carte_perm, we might have issues.
+    // Ideally we should soft delete or block if used.
+    // Simple verification: if used in transactions, throw error.
+    const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "B" AND id_item = ?').get(id) as { count: number };
+    if (usedInTransactions.count > 0) {
+        throw new Error("Impossible de supprimer cette boisson car elle a déjà été vendue.");
+    }
+    
+    // Remove from carte_perm
+    db.prepare('DELETE FROM carte_perm WHERE type = "B" AND id_item = ?').run(id);
+
+    return db.prepare('DELETE FROM boissons WHERE id = ?').run(id);
+}
+
 // ========== CONSOMMABLES ==========
 
 export function getAllConsommables(): Consommable[] {
@@ -383,14 +436,15 @@ export function getConsommableById(id: number): Consommable | undefined {
 
 export function createConsommable(consommable: Omit<Consommable, 'id'>) {
 	const stmt = db.prepare(`
-        INSERT INTO consommables (nom, prix_vente, prix_achat, stock, icone, description)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO consommables (nom, prix_vente, prix_achat, stock, volume_ml, icone, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 	return stmt.run(
 		consommable.nom,
 		consommable.prix_vente,
 		consommable.prix_achat || 0,
 		consommable.stock || 0,
+		consommable.volume_ml || 0,
 		consommable.icone || 'Utensils',
 		consommable.description || null
 	);
@@ -412,6 +466,9 @@ export function updateConsommable(id: number, consommable: Partial<Consommable>)
 	if (consommable.stock !== undefined) {
 		fields.push('stock = ?'); values.push(consommable.stock);
 	}
+	if (consommable.volume_ml !== undefined) {
+		fields.push('volume_ml = ?'); values.push(consommable.volume_ml);
+	}
 	if (consommable.icone !== undefined) {
 		fields.push('icone = ?'); values.push(consommable.icone);
 	}
@@ -425,6 +482,18 @@ export function updateConsommable(id: number, consommable: Partial<Consommable>)
 
 	values.push(id);
 	return db.prepare(`UPDATE consommables SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+export function deleteConsommable(id: number) {
+     const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "C" AND id_item = ?').get(id) as { count: number };
+    if (usedInTransactions.count > 0) {
+        throw new Error("Impossible de supprimer ce consommable car il a déjà été vendu.");
+    }
+
+    // Remove from carte_perm
+    db.prepare('DELETE FROM carte_perm WHERE type = "C" AND id_item = ?').run(id);
+
+    return db.prepare('DELETE FROM consommables WHERE id = ?').run(id);
 }
 
 // ========== STATS & BILAN ==========
@@ -647,4 +716,24 @@ export function removeItemFromPermCarte(idNomPerm: number, type: 'B' | 'C', idIt
 
 export function getPermCarteIds(idNomPerm: number) {
 	return db.prepare('SELECT type, id_item FROM carte_perm WHERE id_nom_perm = ?').all(idNomPerm) as { type: 'B' | 'C', id_item: number }[];
+}
+
+export function getMonthlyStats() {
+    // Group by month (YYYY-MM)
+    // We need to join with boissons/consommables to get purchase price for profit
+    return db.prepare(`
+        SELECT 
+            strftime('%Y-%m', datetime(t.date, 'unixepoch')) as month,
+            SUM(ABS(t.prix)) as total_global,
+            SUM(CASE WHEN t.id_perm IS NOT NULL THEN ABS(t.prix) ELSE 0 END) as total_in_perm,
+            SUM(CASE WHEN t.id_perm IS NULL THEN ABS(t.prix) ELSE 0 END) as total_out_perm,
+            -- Profit calculation
+            SUM(ABS(t.prix) - (t.nb * COALESCE(b.prix_achat, con.prix_achat, 0))) as total_profit
+        FROM transactions t
+        LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
+        LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
+        WHERE t.type IN ('B', 'C')
+        GROUP BY month
+        ORDER BY month DESC
+    `).all();
 }

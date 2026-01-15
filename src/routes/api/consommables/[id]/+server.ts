@@ -32,13 +32,14 @@ export const PATCH: RequestHandler = async (event) => {
 
 	try {
 		const data = (await event.request.json()) as any;
-		const { prix_vente, prix_achat, stock, icone, description, nom } = data;
+		const { prix_vente, prix_achat, stock, icone, description, nom, volume_ml } = data;
 
 		// Validation simple
 		if (
 			(prix_vente !== undefined && prix_vente < 0) ||
 			(prix_achat !== undefined && prix_achat < 0) ||
-			(stock !== undefined && stock < 0)
+			(stock !== undefined && stock < 0) ||
+			(volume_ml !== undefined && volume_ml < 0)
 		) {
 			return json({ error: 'Invalid values' }, { status: 400 });
 		}
@@ -49,7 +50,8 @@ export const PATCH: RequestHandler = async (event) => {
 			stock,
 			icone,
 			description,
-			nom
+			nom,
+			volume_ml // Added
 		});
 
 		const updatedConsommable = getConsommableById(id);

@@ -12,11 +12,17 @@
 	"/api/boissons/[id]": [
 		"src/routes/api/boissons/[id]/+server.ts"
 	],
+	"/api/config/items": [
+		"src/routes/api/config/items/+server.ts"
+	],
 	"/api/consommables": [
 		"src/routes/api/consommables/+server.ts"
 	],
 	"/api/consommables/[id]": [
 		"src/routes/api/consommables/[id]/+server.ts"
+	],
+	"/api/items": [
+		"src/routes/api/items/+server.ts"
 	],
 	"/api/perms": [
 		"src/routes/api/perms/+server.ts"
@@ -35,6 +41,9 @@
 	],
 	"/api/recharge": [
 		"src/routes/api/recharge/+server.ts"
+	],
+	"/api/stats/global": [
+		"src/routes/api/stats/global/+server.ts"
 	],
 	"/api/status": [
 		"src/routes/api/status/+server.ts"

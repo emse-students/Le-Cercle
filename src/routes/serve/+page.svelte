@@ -63,6 +63,74 @@
 
 	let carteItems = $state<any[]>([]);
 
+	let currentCarteItems = $derived(
+		activePerm
+			? carteItems
+					.filter((i) => (selectedType === 'boisson' ? i.type === 'boisson' : i.type === 'consommable'))
+					// Apply sales restrictions
+					.map((i) => {
+						let disabled = false;
+						let reason = '';
+
+						if (selectedUser) {
+							if (selectedUser.statut_cotisation === 'non_cotisant') {
+								disabled = true;
+								reason = 'Non Cotisant';
+							} else if (selectedUser.statut_cotisation === 'cotisant_sans_alcool') {
+								// Check alcohol
+								// Assuming type 'boisson' and degree > 0 implies alcohol
+								if (i.type === 'boisson' && (i.contenu_degre > 0 || i.contenu_type === 'biere')) {
+									disabled = true;
+									reason = 'Sans Alcool';
+								}
+							}
+						}
+						return { ...i, disabled, reason };
+					})
+			: []
+	);
+
+	// Accès Rapide : Top 5 des items récemment vendus
+	let quickAccessItems = $derived.by(() => {
+		if (!activePerm || transactions.length === 0) return [];
+		const uniqueKeys = new Set<string>();
+		const result: any[] = [];
+
+		for (const tx of transactions) {
+			if (tx.type !== 'B' && tx.type !== 'C') continue;
+			const key = `${tx.type}_${tx.id_item}`;
+			if (!uniqueKeys.has(key)) {
+				uniqueKeys.add(key);
+				// Trouver l'item correspondant dans carteItems
+				const item = carteItems.find(
+					(i) =>
+						(tx.type === 'B' ? i.type === 'boisson' : i.type === 'consommable') && i.id === tx.id_item
+				);
+				if (item) {
+					// Appliquer les restrictions au vol
+					let disabled = false;
+					let reason = '';
+					if (selectedUser) {
+						if (selectedUser.statut_cotisation === 'non_cotisant') {
+							disabled = true;
+							reason = 'Cotis.';
+						} else if (
+							selectedUser.statut_cotisation === 'cotisant_sans_alcool' &&
+							item.type === 'boisson' &&
+							(item.contenu_degre > 0 || item.contenu_type === 'biere')
+						) {
+							disabled = true;
+							reason = 'Alcool';
+						}
+					}
+					result.push({ ...item, disabled, reason });
+				}
+			}
+			if (result.length >= 5) break;
+		}
+		return result;
+	});
+
 	async function loadCarte() {
 		if (!activePerm) return;
 		try {
@@ -82,6 +150,21 @@
 
 	async function handleTransaction(item: any, quantity: number) {
 		if (!selectedUser) return;
+
+		// Restriction Checks
+		if (selectedUser.statut_cotisation === 'non_cotisant') {
+			error = 'Vente interdite aux non cotisants';
+			setTimeout(() => (error = ''), 3000);
+			return;
+		}
+		if (selectedUser.statut_cotisation === 'cotisant_sans_alcool') {
+			if (item.type === 'boisson' && (item.contenu_degre > 0 || item.contenu_type === 'biere')) {
+				error = 'Vente alcool interdite (Cotisant Sans Alcool)';
+				setTimeout(() => (error = ''), 3000);
+				return;
+			}
+		}
+
 		if (!activePerm && !isHorsPerm) return;
 
 		loading = true;
@@ -142,21 +225,21 @@
 
 <div class="min-h-screen pt-20 pb-32 md:pb-10 px-4 md:px-8 max-w-[1800px] mx-auto">
 	{#if serverLoading}
-		<div class="flex items-center justify-center h-64 text-rose-500">
+		<div class="flex items-center justify-center h-64 text-brand-red">
 			<Icon name="Loader2" class="animate-spin" size={48} />
 		</div>
 	{:else if !activePerm && !isHorsPerm}
 		<div class="text-center mt-20">
-			<div class="inline-block p-6 rounded-full bg-slate-800 text-slate-500 mb-6">
+			<div class="inline-block p-6 rounded-full bg-bg-card text-text-muted mb-6 shadow-lg">
 				<Icon name="Store" size={64} />
 			</div>
-			<h1 class="text-3xl font-bold text-white mb-2">Aucune permanence en cours</h1>
-			<p class="text-slate-400">
+			<h1 class="text-3xl font-bold text-text-primary mb-2">Aucune permanence en cours</h1>
+			<p class="text-text-muted">
 				Ouvrez une permanence depuis le menu Admin pour commencer le service.
 			</p>
 			<a
 				href="/admin"
-				class="inline-block mt-6 px-6 py-3 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-500 transition-colors"
+				class="inline-block mt-6 px-6 py-3 bg-brand-red text-white rounded-xl font-bold hover:bg-brand-red-hover transition-colors shadow-lg shadow-brand-red/20"
 			>
 				Aller à l'administration
 			</a>
@@ -168,10 +251,10 @@
 			<div class="flex-1 flex flex-col gap-6">
 				<!-- Header Info -->
 				<div
-					class="flex items-center justify-between border p-4 rounded-2xl backdrop-blur-md transition-colors
+					class="flex items-center justify-between border p-4 rounded-2xl backdrop-blur-md transition-colors shadow-sm
                     {isHorsPerm
 						? 'bg-orange-500/10 border-orange-500/30'
-						: 'bg-white/5 border-white/10'}"
+						: 'bg-bg-card border-border'}"
 				>
 					<div class="flex items-center gap-4">
 						<div
@@ -183,7 +266,7 @@
 							<Icon name={isHorsPerm ? 'ShieldAlert' : 'Store'} size={24} />
 						</div>
 						<div>
-							<h2 class="font-bold text-white text-lg">
+							<h2 class="font-bold text-text-primary text-lg">
 								{isHorsPerm ? 'SERVICE HORS PERM' : activePerm.nom}
 							</h2>
 							<div
@@ -201,8 +284,10 @@
 						</div>
 					</div>
 					<div class="text-right hidden sm:block">
-						<div class="text-slate-400 text-xs uppercase tracking-widest">Aujourd'hui</div>
-						<div class="font-mono text-xl text-white font-bold">{new Date().toLocaleDateString()}</div>
+						<div class="text-text-muted text-xs uppercase tracking-widest">Aujourd'hui</div>
+						<div class="font-mono text-xl text-text-primary font-bold">
+							{new Date().toLocaleDateString()}
+						</div>
 					</div>
 				</div>
 
@@ -210,32 +295,32 @@
 				<div class="relative z-20">
 					{#if !selectedUser}
 						<div
-							class="bg-white/5 border border-white/10 p-8 rounded-3xl backdrop-blur-md text-center py-20 border-dashed border-2 hover:border-rose-500/50 transition-colors group"
+							class="bg-bg-card border border-border p-8 rounded-3xl backdrop-blur-md text-center py-20 border-dashed border-2 hover:border-brand-red/50 transition-colors group shadow-xl"
 						>
-							<div class="mb-6 text-slate-500 group-hover:text-white transition-colors">
+							<div class="mb-6 text-text-muted group-hover:text-text-primary transition-colors">
 								<Icon name="Search" size={48} class="mx-auto" />
 							</div>
-							<h3 class="text-2xl font-bold text-white mb-2">Qui a soif ?</h3>
+							<h3 class="text-2xl font-bold text-text-primary mb-2">Qui a soif ?</h3>
 							<div class="max-w-md mx-auto relative mt-6">
 								<UserSearch
 									onSelect={selectUser}
 									placeholder="Carte ou nom..."
-									class="w-full h-14 pl-12 pr-4 rounded-xl bg-black/50 border border-white/20 focus:border-rose-500 outline-none text-white transition-all shadow-xl"
+									class="w-full h-14 pl-12 pr-4 rounded-xl bg-bg-secondary border border-border focus:border-brand-red outline-none text-text-primary transition-all shadow-xl"
 								/>
 							</div>
 						</div>
 					{:else}
 						<div
-							class="bg-gradient-to-br from-rose-900/40 to-black border border-rose-500/30 p-6 rounded-3xl flex items-center justify-between shadow-2xl relative overflow-hidden"
+							class="bg-gradient-to-br from-brand-red/10 to-bg-card border border-brand-red/30 p-6 rounded-3xl flex items-center justify-between shadow-2xl relative overflow-hidden"
 							in:fly={{ y: 20 }}
 						>
 							<div
-								class="absolute right-0 top-0 w-64 h-64 bg-rose-600/20 blur-[100px] pointer-events-none"
+								class="absolute right-0 top-0 w-64 h-64 bg-brand-red/10 blur-[100px] pointer-events-none"
 							></div>
 
 							<div class="flex items-center gap-6 relative z-10">
 								<div
-									class="w-20 h-20 rounded-2xl bg-rose-500 flex items-center justify-center text-3xl font-bold text-white shadow-lg overflow-hidden"
+									class="w-20 h-20 rounded-2xl bg-brand-red flex items-center justify-center text-3xl font-bold text-white shadow-lg overflow-hidden"
 								>
 									{#if selectedUser.photo_url}
 										<img src={selectedUser.photo_url} alt="Avatar" class="w-full h-full object-cover" />
@@ -244,9 +329,13 @@
 									{/if}
 								</div>
 								<div>
-									<h2 class="text-3xl font-black text-white">{selectedUser.prenom} {selectedUser.nom}</h2>
+									<h2 class="text-3xl font-black text-text-primary">
+										{selectedUser.prenom}
+										{selectedUser.nom}
+									</h2>
 									<div class="flex items-center gap-3 mt-1">
-										<span class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-white/10 text-slate-300"
+										<span
+											class="px-2 py-0.5 rounded text-xs font-bold uppercase bg-bg-secondary text-text-muted"
 											>{selectedUser.role}</span
 										>
 										<div
@@ -260,22 +349,50 @@
 
 							<button
 								onclick={() => (selectedUser = null)}
-								class="relative z-10 p-4 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors"
+								class="relative z-10 p-4 bg-bg-secondary hover:bg-bg-tertiary rounded-xl text-text-primary transition-colors"
 							>
 								<Icon name="X" size={24} />
 							</button>
 						</div>
 
-						<!-- Item Selector -->
 						<div
-							class="flex-1 bg-white/5 border border-white/10 rounded-3xl p-6 mt-6 backdrop-blur-md overflow-y-auto flex flex-col gap-4"
+							class="flex-1 bg-bg-card border border-border rounded-3xl p-6 mt-6 backdrop-blur-md overflow-y-auto flex flex-col gap-4 shadow-xl"
 						>
-							<div class="flex p-1 bg-black/40 rounded-xl">
+							{#if quickAccessItems.length > 0}
+								<div class="mb-2">
+									<div class="flex items-center gap-2 mb-3 px-1">
+										<Icon name="Zap" size={14} class="text-brand-yellow" />
+										<span class="text-[10px] font-bold uppercase tracking-widest text-text-muted"
+											>Accès Rapide</span
+										>
+									</div>
+									<div class="flex flex-wrap gap-2">
+										{#each quickAccessItems as item}
+											<button
+												onclick={() => handleTransaction(item, 1)}
+												disabled={item.disabled}
+												class="flex items-center gap-2 px-3 py-2 bg-bg-secondary border border-border rounded-xl hover:border-brand-red/50 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												<div class="text-brand-red group-hover:scale-110 transition-transform">
+													<Icon name={item.icone || (item.type === 'boisson' ? 'Beer' : 'Utensils')} size={16} />
+												</div>
+												<span class="text-xs font-bold text-text-primary">{item.nom || item.contenu_nom}</span>
+												{#if item.reason}
+													<span class="text-[8px] bg-red-500/10 text-red-500 px-1 rounded">{item.reason}</span>
+												{/if}
+											</button>
+										{/each}
+									</div>
+								</div>
+								<div class="border-t border-border my-2"></div>
+							{/if}
+
+							<div class="flex p-1 bg-bg-secondary rounded-xl">
 								<button
 									class="flex-1 py-3 rounded-lg text-sm font-bold uppercase tracking-widest transition-all {selectedType ===
 									'boisson'
-										? 'bg-rose-600 text-white shadow-lg'
-										: 'text-slate-400 hover:bg-white/5'}"
+										? 'bg-brand-red text-white shadow-lg'
+										: 'text-text-muted hover:bg-bg-tertiary'}"
 									onclick={() => (selectedType = 'boisson')}
 								>
 									<div class="flex items-center justify-center gap-2">
@@ -285,8 +402,8 @@
 								<button
 									class="flex-1 py-3 rounded-lg text-sm font-bold uppercase tracking-widest transition-all {selectedType ===
 									'consommable'
-										? 'bg-rose-600 text-white shadow-lg'
-										: 'text-slate-400 hover:bg-white/5'}"
+										? 'bg-brand-red text-white shadow-lg'
+										: 'text-text-muted hover:bg-bg-tertiary'}"
 									onclick={() => (selectedType = 'consommable')}
 								>
 									<div class="flex items-center justify-center gap-2">
@@ -296,21 +413,17 @@
 							</div>
 
 							<!-- Carte Filtering Logic & UI -->
-							{@const currentCarteItems = activePerm
-								? carteItems.filter((i) =>
-										selectedType === 'boisson' ? i.type === 'boisson' : i.type === 'consommable'
-									)
-								: []}
-
 							{#if activePerm && currentCarteItems.length === 0}
-								<div class="text-center py-10 bg-white/5 rounded-2xl border border-white/10 border-dashed">
-									<Icon name="Slash" class="mb-4 mx-auto text-slate-500" size={32} />
-									<h3 class="text-lg font-bold text-white">La carte est vide</h3>
-									<p class="text-sm text-slate-400 mb-4">
+								<div
+									class="text-center py-10 bg-bg-secondary/50 rounded-2xl border border-border border-dashed"
+								>
+									<Icon name="Slash" class="mb-4 mx-auto text-text-muted" size={32} />
+									<h3 class="text-lg font-bold text-text-primary">La carte est vide</h3>
+									<p class="text-sm text-text-muted mb-4">
 										Aucun item de ce type n'a été ajouté à cette perm.
 									</p>
 									{#if isCercleux}
-										<a href="/admin" class="text-rose-400 hover:underline">Gérer la carte dans l'admin</a>
+										<a href="/admin" class="text-brand-red hover:underline">Gérer la carte dans l'admin</a>
 									{/if}
 								</div>
 							{:else}
@@ -326,23 +439,23 @@
 			</div>
 
 			<!-- RIGHT PANEL: HISTORY -->
-			<div class="w-full xl:w-96 bg-black/20 border-l border-white/5 p-6 hidden xl:flex flex-col">
+			<div class="w-full xl:w-96 bg-bg-secondary border-l border-border p-6 hidden xl:flex flex-col">
 				<h3
-					class="font-bold text-slate-400 uppercase tracking-widest text-xs mb-6 flex items-center gap-2"
+					class="font-bold text-text-muted uppercase tracking-widest text-xs mb-6 flex items-center gap-2"
 				>
 					<Icon name="History" size={14} /> Dernières commandes
 				</h3>
 
 				{#if lastSuccess}
 					<div
-						class="mb-6 bg-emerald-500/20 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-4 text-emerald-400"
+						class="mb-6 bg-success/20 border border-success/30 p-4 rounded-xl flex items-center gap-4 text-success"
 						transition:fly={{ y: -20 }}
 					>
-						<div class="bg-emerald-500 text-black p-2 rounded-full">
+						<div class="bg-success text-white p-2 rounded-full">
 							<Icon name="Check" size={16} />
 						</div>
 						<div>
-							<div class="font-bold text-white">Commande validée</div>
+							<div class="font-bold text-text-primary">Commande validée</div>
 							<div class="text-xs opacity-80">{lastSuccess.user} a pris {lastSuccess.item}</div>
 						</div>
 					</div>
@@ -351,26 +464,26 @@
 				<div class="space-y-3 overflow-y-auto flex-1 pr-2">
 					{#each transactions as tx}
 						<div
-							class="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group border border-transparent hover:border-white/5"
+							class="flex items-center justify-between p-3 rounded-xl hover:bg-bg-tertiary transition-colors group border border-transparent hover:border-border"
 						>
 							<div class="flex items-center gap-3">
 								<div
-									class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-400"
+									class="w-8 h-8 rounded-full bg-bg-tertiary flex items-center justify-center text-xs font-bold text-text-muted"
 								>
 									{tx.user_prenom ? tx.user_prenom[0] : '?'}
 								</div>
 								<div>
-									<div class="font-bold text-slate-200 text-sm">
+									<div class="font-bold text-text-primary text-sm">
 										{tx.boisson_nom || tx.consommable_nom || 'Transaction'}
 									</div>
-									<div class="text-[10px] text-slate-500">
+									<div class="text-[10px] text-text-muted">
 										{tx.user_prenom || 'Inconnu'} • {tx.date
 											? new Date(tx.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 											: ''}
 									</div>
 								</div>
 							</div>
-							<div class="font-mono text-white font-bold text-sm">
+							<div class="font-mono text-text-primary font-bold text-sm">
 								{tx.prix ? Math.abs(tx.prix).toFixed(2) : '0.00'}€
 							</div>
 						</div>

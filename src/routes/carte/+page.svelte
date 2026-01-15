@@ -3,14 +3,21 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PageBackground from '$lib/components/PageBackground.svelte';
 	import EditItemModal from '$lib/components/EditItemModal.svelte';
+	import StockModal from '$lib/components/StockModal.svelte';
 	import { formatCurrency } from '$lib/theme-config';
+	import { page } from '$app/stores';
+
+	let isCercleux = $derived($page.data.user?.role === 'cercleux');
 
 	let boissons = $state<any[]>([]);
 	let consommables = $state<any[]>([]);
 	let loading = $state(true);
 	let activeTab = $state<'boissons' | 'consommables'>('boissons');
 	let showModal = $state(false);
+	let showStockModal = $state(false);
 	let editingItem = $state<any>(null);
+	let stockItem = $state<any>(null);
+	let stockType = $state<'boisson' | 'consommable'>('boisson');
 	let editingType = $state<'boisson' | 'consommable'>('boisson');
 
 	onMount(async () => {
@@ -45,107 +52,66 @@
 		editingItem = null;
 	}
 
-    async function changeKeg(boisson: any) {
-        const volumeRestantPrecedent = (boisson.volume_restant || 0).toFixed(1);
-        const capacitePrecedente = boisson.contenant_capacite || 30;
-        const pourcentageRestant = ((boisson.volume_restant || 0) / capacitePrecedente * 100).toFixed(0);
+	function openCreateModal(type: 'boisson' | 'consommable') {
+		editingItem = null;
+		editingType = type;
+		showModal = true;
+	}
 
-        if (!confirm(`Changer le fût de ${boisson.contenu_nom} ?\nVolume restant théorique : ${volumeRestantPrecedent}L (${pourcentageRestant}%).\n\nLe stock de pleins sera décrémenté.`)) return;
+	function openStockModal(item: any, type: 'boisson' | 'consommable') {
+		stockItem = item;
+		stockType = type;
+		showStockModal = true;
+	}
 
-        const inputPerte = prompt(`Volume réellement RESTANT (pertes) dans le fût terminé ?\nThéorique : ${volumeRestantPrecedent}L\nLaissez vide pour accepter la valeur théorique.`, volumeRestantPrecedent);
-        if (inputPerte === null) return;
-        
-        const perteReelle = parseFloat(inputPerte.replace(',', '.'));
-        if (isNaN(perteReelle)) {
-            alert("Volume invalide");
-            return;
-        }
+	function closeStockModal() {
+		showStockModal = false;
+		stockItem = null;
+	}
 
-        const inputNouveauVolume = prompt(`Capacité du NOUVEAU fût (en Litres) ?`, capacitePrecedente.toString());
-        if (!inputNouveauVolume) return;
-        const nouveauVolume = parseFloat(inputNouveauVolume.replace(',', '.'));
-        if (isNaN(nouveauVolume)) {
-            alert("Volume invalide");
-            return;
-        }
+	const iconColors: Record<string, string> = {
+		// Boissons
+		Beer: 'text-amber-400 bg-amber-400/10',
+		Wine: 'text-red-500 bg-red-500/10',
+		Coffee: 'text-amber-800 bg-amber-800/10',
+		CupSoda: 'text-amber-600 bg-amber-600/10',
+		Droplet: 'text-blue-400 bg-blue-400/10',
+		GlassWater: 'text-cyan-400 bg-cyan-400/10',
+		Milk: 'text-blue-100 bg-blue-100/10',
+		Flame: 'text-orange-500 bg-orange-500/10',
+		// Consommables
+		Pizza: 'text-orange-500 bg-orange-500/10',
+		Sandwich: 'text-yellow-600 bg-yellow-600/10',
+		Cookie: 'text-amber-700 bg-amber-700/10',
+		Beef: 'text-red-700 bg-red-700/10',
+		Cherry: 'text-red-500 bg-red-500/10',
+		Carrot: 'text-orange-500 bg-orange-500/10',
+		Apple: 'text-green-500 bg-green-500/10',
+		Utensils: 'text-slate-400 bg-slate-400/10',
+		Salad: 'text-green-400 bg-green-400/10',
+		Fish: 'text-blue-400 bg-blue-400/10',
+		CookingPot: 'text-amber-500 bg-amber-500/10',
+		Candy: 'text-purple-400 bg-purple-400/10',
+		Croissant: 'text-yellow-500 bg-yellow-500/10',
+		CakeSlice: 'text-pink-400 bg-pink-400/10'
+	};
 
-        const newStock = Math.max(0, (boisson.nb_plein || 0) - 1);
-        const newVide = (boisson.nb_vide || 0) + 1;
+	function getIconColorClass(iconName: string) {
+		return iconColors[iconName] || 'text-brand-red bg-brand-red/10';
+	}
 
-        try {
-            await fetch(`/api/boissons/${boisson.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nb_plein: newStock,
-                    nb_vide: newVide,
-                    volume_restant: nouveauVolume
-                    // On pourrait logger la perte réelle ici si on avait une table de logs
-                })
-            });
-            loadData();
-        } catch(e) {
-            console.error(e);
-            alert("Erreur lors du changement de fût");
-        }
-    }
+	function getScoreCuite(item: any, type: 'boisson' | 'consommable') {
+		const degre =
+			type === 'boisson' ? item.contenu_degre : item.nom?.toLowerCase()?.includes('alcool') ? 5 : 0; // Mock degre for alcoholic snacks if any
+		const volume_ml = type === 'boisson' ? item.contenant_capacite || 0 : item.volume_ml || 0;
+		const prix = item.prix_vente || 1;
 
-    async function addStock(item: any, type: 'boisson' | 'consommable') {
-        const input = prompt("Combien d'unités ajouter au stock ?", "1");
-        if (!input) return;
-        const qty = parseInt(input);
-        if (isNaN(qty)) return;
-
-        try {
-            const endpoint = type === 'boisson' ? `/api/boissons/${item.id}` : `/api/consommables/${item.id}`;
-            const currentStock = type === 'boisson' ? (item.nb_plein || 0) : (item.stock || item.nb || 0);
-            
-            const payload = type === 'boisson' 
-                ? { nb_plein: currentStock + qty }
-                : { stock: currentStock + qty };
-
-            await fetch(endpoint, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            loadData();
-        } catch(e) {
-            console.error(e);
-            alert("Erreur lors de l'ajout de stock");
-        }
-    }
-
-    const iconColors: Record<string, string> = {
-        // Boissons
-        'Beer': 'text-amber-400 bg-amber-400/10',
-        'Wine': 'text-red-500 bg-red-500/10',
-        'Coffee': 'text-amber-800 bg-amber-800/10',
-        'CupSoda': 'text-amber-600 bg-amber-600/10',
-        'Droplet': 'text-blue-400 bg-blue-400/10',
-        'GlassWater': 'text-cyan-400 bg-cyan-400/10',
-        'Milk': 'text-blue-100 bg-blue-100/10',
-        'Flame': 'text-orange-500 bg-orange-500/10',
-        // Consommables
-        'Pizza': 'text-orange-500 bg-orange-500/10',
-        'Sandwich': 'text-yellow-600 bg-yellow-600/10',
-        'Cookie': 'text-amber-700 bg-amber-700/10',
-        'Beef': 'text-red-700 bg-red-700/10',
-        'Cherry': 'text-red-500 bg-red-500/10',
-        'Carrot': 'text-orange-500 bg-orange-500/10',
-        'Apple': 'text-green-500 bg-green-500/10',
-        'Utensils': 'text-slate-400 bg-slate-400/10',
-        'Salad': 'text-green-400 bg-green-400/10',
-        'Fish': 'text-blue-400 bg-blue-400/10',
-        'CookingPot': 'text-amber-500 bg-amber-500/10',
-        'Candy': 'text-purple-400 bg-purple-400/10',
-        'Croissant': 'text-yellow-500 bg-yellow-500/10',
-        'CakeSlice': 'text-pink-400 bg-pink-400/10'
-    };
-
-    function getIconColorClass(iconName: string) {
-        return iconColors[iconName] || 'text-brand-red bg-brand-red/10';
-    }
+		if (!degre || !volume_ml || !prix) return 0;
+		// Formula: (degre% * volume_L) / price_EUR
+		// 100% = 5.0 (ex: 50cl 10% for 1€, or 50cl 5% for 0.5€)
+		const rawScore = (degre * (volume_ml / 1000)) / prix;
+		return Math.min(100, Math.max(0, (rawScore / 5) * 100));
+	}
 </script>
 
 <PageBackground variant="minimal" />
@@ -157,15 +123,33 @@
 				<Icon name="BookOpen" size={32} />
 			</div>
 			<div>
-				<h1 class="text-4xl font-black uppercase tracking-tighter italic text-text-primary">
-					Carte
-				</h1>
+				<h1 class="text-4xl font-black uppercase tracking-tighter italic text-text-primary">Carte</h1>
 			</div>
 		</div>
+
+		{#if isCercleux}
+			<!-- Action Buttons (Admins) -->
+			<div class="flex gap-2 mt-6">
+				<button
+					onclick={() => openCreateModal('boisson')}
+					class="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-bg-card hover:border-brand-red transition-all text-sm font-bold text-text-primary"
+				>
+					<Icon name="PlusCircle" size={18} class="text-brand-red" />
+					Ajouter une boisson
+				</button>
+				<button
+					onclick={() => openCreateModal('consommable')}
+					class="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-bg-card hover:border-brand-red transition-all text-sm font-bold text-text-primary"
+				>
+					<Icon name="PlusCircle" size={18} class="text-brand-red" />
+					Ajouter un snack
+				</button>
+			</div>
+		{/if}
 	</header>
 
 	<!-- Tab Selector -->
-	<div class="flex gap-4 mb-8 bg-bg-card border border-white/5 rounded-2xl p-2">
+	<div class="flex gap-4 mb-8 bg-bg-card border border-border rounded-2xl p-2">
 		<button
 			onclick={() => (activeTab = 'boissons')}
 			class="flex-1 py-4 rounded-xl text-sm font-bold uppercase tracking-widest transition-all {activeTab ===
@@ -198,16 +182,18 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each boissons as boisson (boisson.id)}
 				<div
-					class="bg-bg-card border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all group"
+					class="bg-bg-card border border-border rounded-2xl p-6 hover:border-border-hover transition-all group"
 				>
 					<div class="flex items-start justify-between mb-4">
 						<div class="flex-1">
-						<h3 class="font-bold text-lg text-text-primary">
-							{boisson.contenu_nom || 'Inconnu'}
-						</h3>
+							<h3 class="font-bold text-lg text-text-primary">
+								{boisson.contenu_nom || 'Inconnu'}
+							</h3>
 						</div>
 						<div
-							class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors {getIconColorClass(boisson.icone || 'Beer')}"
+							class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors {getIconColorClass(
+								boisson.icone || 'Beer'
+							)}"
 						>
 							<Icon name={boisson.icone || 'Beer'} size={24} />
 						</div>
@@ -216,65 +202,109 @@
 					<div class="space-y-2 mb-4">
 						<div class="flex justify-between items-center text-sm">
 							<span class="text-text-muted">Prix</span>
-							<span class="text-xl font-black text-text-primary">{formatCurrency(boisson.prix_vente)}</span>
+							<span class="text-xl font-black text-text-primary">{formatCurrency(boisson.prix_vente)}</span
+							>
+						</div>
+						{#if boisson.contenu_degre}
+							<div class="flex justify-between items-center text-sm mt-1">
+								<span class="text-text-muted">Alcool</span>
+								<span class="font-bold text-text-primary">{boisson.contenu_degre}°</span>
+							</div>
+							<div class="flex justify-between items-center text-sm mt-1">
+								<span class="text-text-muted">Qualité/Cuite</span>
+								<div class="flex items-center gap-2">
+									<div class="w-16 h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border">
+										<div
+											class="h-full bg-brand-red"
+											style="width: {getScoreCuite(boisson, 'boisson')}%"
+										></div>
+									</div>
+									<span
+										class="font-bold text-xs {getScoreCuite(boisson, 'boisson') > 80
+											? 'text-brand-red'
+											: 'text-text-muted'}">{getScoreCuite(boisson, 'boisson').toFixed(0)}%</span
+									>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<div class="flex gap-2 pt-4 border-t border-border">
+						<div class="flex-1">
+							<div class="text-[10px] uppercase font-bold text-text-muted mb-1">
+								{boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi'
+									? 'Fûts en stock'
+									: 'Stock'}
+							</div>
+							<div class="text-xl font-bold text-success">
+								{#if boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi'}
+									<span
+										>{(
+											(boisson.nb_plein || 0) * ((boisson.contenant_capacite || 30000) / 1000) +
+											(boisson.volume_restant || 0)
+										).toFixed(0)} L</span
+									>
+									<span class="text-xs font-medium text-text-muted block font-normal mt-1">
+										({boisson.nb_plein} pleins + {(boisson.volume_restant || 0).toFixed(1)}L)
+									</span>
+								{:else}
+									{boisson.nb_plein || 0}
+									<span class="text-xs font-medium text-text-muted">unités</span>
+								{/if}
+							</div>
 						</div>
 					</div>
 
-					<div class="flex gap-2 pt-4 border-t border-white/5">
-						<div class="flex-1">
-							<div class="text-[10px] uppercase font-bold text-text-muted mb-1">
-                                {boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi' ? 'Fûts en stock' : 'Stock'}
-                            </div>
-							<div class="text-xl font-bold text-success">
-                                {boisson.nb_plein || 0} 
-                                <span class="text-xs font-medium text-text-muted">
-                                    {boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi' ? 'pleins' : 'unités'}
-                                </span>
-                            </div>
-						</div>
-					</div>
-					
 					{#if boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi'}
-						<div class="mt-4 pt-4 border-t border-white/5">
+						<div class="mt-4 pt-4 border-t border-border">
 							<div class="flex justify-between items-center mb-2">
 								<span class="text-[10px] font-bold uppercase text-text-muted">Volume restant</span>
 								<span class="text-sm font-mono font-bold text-amber-500">
-                                    {(boisson.volume_restant || 0).toFixed(1)}L / {boisson.contenant_capacite}L
-                                </span>
+									{(boisson.volume_restant || 0).toFixed(1)}L / {(boisson.contenant_capacite || 30000) /
+										1000}L
+								</span>
 							</div>
 							<div class="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
-								<div 
-                                    class="h-full bg-amber-500" 
-                                    style="width: {Math.min(100, Math.max(0, ((boisson.volume_restant || 0) / (boisson.contenant_capacite || 1)) * 100))}%"
-                                ></div>
+								<div
+									class="h-full bg-amber-500"
+									style="width: {Math.min(
+										100,
+										Math.max(
+											0,
+											((boisson.volume_restant || 0) / ((boisson.contenant_capacite || 30000) / 1000)) * 100
+										)
+									)}%"
+								></div>
 							</div>
 						</div>
 					{/if}
 
-                    <div class="grid grid-cols-2 gap-2 mt-4">
-                        <button
-                            onclick={() => openEditModal(boisson, 'boisson')}
-                            class="py-2.5 rounded-lg bg-bg-secondary border border-white/5 text-text-primary font-bold text-xs uppercase hover:bg-bg-tertiary transition-all"
-                        >
-                            Modifier
-                        </button>
-                        
-                        {#if boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi'}
-                             <button
-                                onclick={() => changeKeg(boisson)}
-                                class="py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 font-bold text-xs uppercase hover:bg-amber-500 hover:text-black transition-all"
-                            >
-                                Recharger
-                            </button>
-                        {:else}
-                             <button
-                                onclick={() => addStock(boisson, 'boisson')}
-                                class="py-2.5 rounded-lg bg-success/10 border border-success/20 text-success font-bold text-xs uppercase hover:bg-success hover:text-black transition-all"
-                            >
-                                + Stock
-                            </button>
-                        {/if}
-                    </div>
+					<div class="grid grid-cols-2 gap-2 mt-4">
+						{#if isCercleux}
+							<button
+								onclick={() => openEditModal(boisson, 'boisson')}
+								class="py-2.5 rounded-lg bg-bg-secondary border border-border text-text-primary font-bold text-xs uppercase hover:bg-bg-tertiary transition-all"
+							>
+								Modifier
+							</button>
+						{/if}
+
+						{#if boisson.contenant_type === 'fut' || boisson.contenant_type === 'cubi'}
+							<button
+								onclick={() => openStockModal(boisson, 'boisson')}
+								class="py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 font-bold text-xs uppercase hover:bg-amber-500 hover:text-black transition-all"
+							>
+								Recharger
+							</button>
+						{:else}
+							<button
+								onclick={() => openStockModal(boisson, 'boisson')}
+								class="py-2.5 rounded-lg bg-success/10 border border-success/20 text-success font-bold text-xs uppercase hover:bg-success hover:text-black transition-all"
+							>
+								+ Stock
+							</button>
+						{/if}
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -282,14 +312,16 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 			{#each consommables as item (item.id)}
 				<div
-					class="bg-bg-card border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all group"
+					class="bg-bg-card border border-border rounded-2xl p-6 hover:border-border-hover transition-all group"
 				>
 					<div class="flex items-start justify-between mb-4">
 						<div class="flex-1">
-						<h3 class="font-bold text-lg text-text-primary">{item.nom}</h3>
+							<h3 class="font-bold text-lg text-text-primary">{item.nom}</h3>
 						</div>
 						<div
-							class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors {getIconColorClass(item.icone || 'Utensils')}"
+							class="w-12 h-12 rounded-xl flex items-center justify-center transition-colors {getIconColorClass(
+								item.icone || 'Utensils'
+							)}"
 						>
 							<Icon name={item.icone || 'Utensils'} size={24} />
 						</div>
@@ -300,32 +332,58 @@
 							<span class="text-text-muted">Prix</span>
 							<span class="text-xl font-black text-text-primary">{formatCurrency(item.prix_vente)}</span>
 						</div>
+						{#if item.volume_ml > 0}
+							<div class="flex justify-between items-center text-sm mt-1">
+								<span class="text-text-muted">Vol.</span>
+								<span class="font-bold text-text-primary">{item.volume_ml} mL</span>
+							</div>
+						{/if}
+						{#if getScoreCuite(item, 'consommable') > 0}
+							<div class="flex justify-between items-center text-sm mt-1">
+								<span class="text-text-muted">Qualité/Cuite</span>
+								<div class="flex items-center gap-2">
+									<div class="w-16 h-1.5 bg-bg-primary rounded-full overflow-hidden border border-border">
+										<div
+											class="h-full bg-brand-red"
+											style="width: {getScoreCuite(item, 'consommable')}%"
+										></div>
+									</div>
+									<span
+										class="font-bold text-xs {getScoreCuite(item, 'consommable') > 80
+											? 'text-brand-red'
+											: 'text-text-muted'}">{getScoreCuite(item, 'consommable').toFixed(0)}%</span
+									>
+								</div>
+							</div>
+						{/if}
 					</div>
 
-					<div class="pt-4 border-t border-white/5">
+					<div class="pt-4 border-t border-border">
 						<div class="flex justify-between items-center">
 							<div class="text-[10px] text-text-muted uppercase font-bold">En Stock</div>
 							<div class="text-xl font-bold text-success">
-                                {item.stock || item.nb || 0}
-                                <span class="text-xs font-medium text-text-muted">unités</span>
-                            </div>
+								{item.stock || item.nb || 0}
+								<span class="text-xs font-medium text-text-muted">unités</span>
+							</div>
 						</div>
 					</div>
 
-                    <div class="grid grid-cols-2 gap-2 mt-4">
-                        <button
-                            onclick={() => openEditModal(item, 'consommable')}
-                            class="py-2.5 rounded-lg bg-bg-secondary border border-white/5 text-text-primary font-bold text-xs uppercase hover:bg-bg-tertiary transition-all"
-                        >
-                            Modifier
-                        </button>
-                        <button
-                            onclick={() => addStock(item, 'consommable')}
-                            class="py-2.5 rounded-lg bg-success/10 border border-success/20 text-success font-bold text-xs uppercase hover:bg-success hover:text-black transition-all"
-                        >
-                            + Stock
-                        </button>
-                    </div>
+					<div class="grid grid-cols-2 gap-2 mt-4">
+						{#if isCercleux}
+							<button
+								onclick={() => openEditModal(item, 'consommable')}
+								class="py-2.5 rounded-lg bg-bg-secondary border border-border text-text-primary font-bold text-xs uppercase hover:bg-bg-tertiary transition-all"
+							>
+								Modifier
+							</button>
+						{/if}
+						<button
+							onclick={() => openStockModal(item, 'consommable')}
+							class="py-2.5 rounded-lg bg-success/10 border border-success/20 text-success font-bold text-xs uppercase hover:bg-success hover:text-black transition-all"
+						>
+							+ Stock
+						</button>
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -359,6 +417,16 @@
 		item={editingItem}
 		type={editingType}
 		onClose={closeModal}
+		onSuccess={loadData}
+	/>
+{/if}
+
+{#if showStockModal}
+	<StockModal
+		bind:show={showStockModal}
+		item={stockItem}
+		type={stockType}
+		onClose={closeStockModal}
 		onSuccess={loadData}
 	/>
 {/if}
