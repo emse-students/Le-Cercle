@@ -1,102 +1,44 @@
-// Authentication utilities and middleware
-import type { RequestEvent } from '@sveltejs/kit';
-import { error } from '@sveltejs/kit';
+import { SvelteKitAuth } from '@auth/sveltekit';
+import { env } from '$env/dynamic/private';
+import type { JWT } from '@auth/core/jwt';
+import type { Session, User, Profile } from '@auth/core/types';
 
-export type UserRole = 'user' | 'cercleux';
-export type StatutCotisation = 'non_cotisant' | 'cotisant_sans_alcool' | 'cotisant_avec_alcool';
+export const { handle } = SvelteKitAuth({
+	providers: [
+		{
+			id: 'cas-emse', // signIn("my-provider") and will be part of the callback URL
+			name: 'CAS EMSE', // optional, used on the default login page as the button text.
+			type: 'oidc',
+			issuer: 'https://cas.emse.fr/cas/oidc', // to infer the .well-known/openid-configuration URL
+			clientId: env.CAS_CLIENT_ID, // from the provider's dashboard
+			clientSecret: env.CAS_CLIENT_SECRET, // from the provider's dashboard
+			client: {
+				token_endpoint_auth_method: 'client_secret_post'
+			},
+			authorization: {
+				scope: 'openid profile email'
+			}
+		}
+	],
+	trustHost: env.AUTH_TRUSTED_HOST === 'true',
+	secret: env.AUTH_SECRET,
+	callbacks: {
+		jwt({ token, user, profile }: { token: JWT; user?: User; profile?: Profile }): JWT {
+			if (user) {
+				token.id = profile?.sub;
+			}
+			return token;
+		},
 
-export interface AuthUser {
-	id: number;
-	login: string;
-	mail: string;
-	firstname: string;
-	lastname: string;
-	promo: number;
-	role: UserRole;
-	statut_cotisation: StatutCotisation;
-	solde: number;
-	photo_url?: string | null;
-}
-
-/**
- * Get current user from session/locals
- * TODO: Replace with real CAS authentication
- */
-export function getCurrentUser(event: RequestEvent): AuthUser | null {
-	return event.locals.user || null;
-}
-
-/**
- * Require authenticated user
- */
-export function requireAuth(event: RequestEvent): AuthUser {
-	const user = getCurrentUser(event);
-	if (!user) {
-		throw error(401, 'Non authentifié');
+		session({ session, token }: { session: Session; token: JWT }): Session {
+			if (token && session.user) {
+				session.user.id = token.id as string;
+				session.user.email = token.email as string;
+				session.user.name = token.name as string;
+			}
+			return session;
+		}
 	}
-	return user;
-}
+});
 
-/**
- * Require cercleux role (admin)
- */
-export function requireCercleux(event: RequestEvent): AuthUser {
-	const user = requireAuth(event);
-	if (user.role !== 'cercleux') {
-		throw error(403, 'Accès réservé aux administrateurs');
-	}
-	return user;
-}
-
-/**
- * Require cotisant status (avec ou sans alcool)
- */
-export function requireCotisant(event: RequestEvent): AuthUser {
-	const user = requireAuth(event);
-	if (
-		user.statut_cotisation !== 'cotisant_avec_alcool' &&
-		user.statut_cotisation !== 'cotisant_sans_alcool'
-	) {
-		throw error(403, 'Accès réservé aux cotisants');
-	}
-	return user;
-}
-
-/**
- * Check if user is cotisant
- */
-export function isCotisant(user: AuthUser | null): boolean {
-	if (!user) {
-		return false;
-	}
-	return (
-		user.statut_cotisation === 'cotisant_avec_alcool' ||
-		user.statut_cotisation === 'cotisant_sans_alcool'
-	);
-}
-
-/**
- * Require serveur role (at least) or valid barman
- */
-export function requireServeur(event: RequestEvent): AuthUser {
-	const user = requireAuth(event);
-	// On autorise tout utilisateur authentifié à passer cette barrière initiale.
-	// Les routes spécifiques DOIVENT vérifier si l'utilisateur est barman de la perm active
-	// ou est 'cercleux'.
-	// checkServeurPermAccess(userId, permId) doit être appelé plus tard.
-	return user;
-}
-
-/**
- * Check if user is assigned to a perm and perm is open
- */
-export async function checkServeurPermAccess(userId: number, permId: number): Promise<boolean> {
-	const { isUserInPerm, isPermOpen } = await import('$lib/db/queries');
-
-	const [inPerm, permOpen] = await Promise.all([
-		isUserInPerm(userId, permId),
-		isPermOpen(permId)
-	]);
-
-	return inPerm && permOpen;
-}
+export * from './auth-utils';

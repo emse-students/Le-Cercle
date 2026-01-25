@@ -26,39 +26,36 @@
  * ```
  */
 declare module '$env/static/private' {
+	export const AUTH_TRUST_HOST: string;
+	export const AUTH_SECRET: string;
 	export const ALLUSERSPROFILE: string;
-	export const ANTIGRAVITY_CLI_ALIAS: string;
+	export const AMDRMPATH: string;
 	export const APPDATA: string;
 	export const ChocolateyInstall: string;
 	export const ChocolateyLastPathUpdate: string;
 	export const CHROME_CRASHPAD_PIPE_NAME: string;
-	export const cloudflared: string;
 	export const COLORTERM: string;
 	export const CommonProgramFiles: string;
 	export const CommonProgramW6432: string;
 	export const COMPUTERNAME: string;
 	export const ComSpec: string;
-	export const dd: string;
 	export const DriverData: string;
-	export const EFC_8036_1262719628: string;
-	export const EFC_8036_1592913036: string;
-	export const EFC_8036_2283032206: string;
-	export const EFC_8036_2775293581: string;
-	export const EFC_8036_3789132940: string;
+	export const EFC_10272_1262719628: string;
+	export const EFC_10272_1592913036: string;
+	export const EFC_10272_2283032206: string;
+	export const EFC_10272_3789132940: string;
 	export const FPS_BROWSER_APP_PROFILE_STRING: string;
 	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const GENARTS_LICENSE: string;
 	export const GIT_ASKPASS: string;
-	export const GOPATH: string;
+	export const GIT_PAGER: string;
+	export const GRADLE_HOME: string;
 	export const HOMEDRIVE: string;
 	export const HOMEPATH: string;
 	export const JAVA_HOME: string;
 	export const LANG: string;
 	export const LOCALAPPDATA: string;
 	export const LOGONSERVER: string;
-	export const MOZ_CRASHREPORTER_DATA_DIRECTORY: string;
-	export const MOZ_CRASHREPORTER_EVENTS_DIRECTORY: string;
-	export const MOZ_CRASHREPORTER_PING_DIRECTORY: string;
 	export const NODE: string;
 	export const NODE_ENV: string;
 	export const npm_command: string;
@@ -72,10 +69,8 @@ declare module '$env/static/private' {
 	export const npm_package_name: string;
 	export const npm_package_version: string;
 	export const NUMBER_OF_PROCESSORS: string;
-	export const NVM_HOME: string;
-	export const NVM_SYMLINK: string;
 	export const OneDrive: string;
-	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
+	export const OneDriveConsumer: string;
 	export const OS: string;
 	export const Path: string;
 	export const PATHEXT: string;
@@ -90,6 +85,10 @@ declare module '$env/static/private' {
 	export const PSModulePath: string;
 	export const PUBLIC: string;
 	export const PWD: string;
+	export const PyCharm: string;
+	export const PYENV: string;
+	export const PYTHONSTARTUP: string;
+	export const PYTHON_BASIC_REPL: string;
 	export const SESSIONNAME: string;
 	export const SystemDrive: string;
 	export const SystemRoot: string;
@@ -101,7 +100,6 @@ declare module '$env/static/private' {
 	export const USERDOMAIN_ROAMINGPROFILE: string;
 	export const USERNAME: string;
 	export const USERPROFILE: string;
-	export const VBOX_MSI_INSTALL_PATH: string;
 	export const VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 	export const VSCODE_GIT_ASKPASS_MAIN: string;
 	export const VSCODE_GIT_ASKPASS_NODE: string;
@@ -109,7 +107,6 @@ declare module '$env/static/private' {
 	export const VSCODE_INJECTION: string;
 	export const VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 	export const windir: string;
-	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -139,39 +136,36 @@ declare module '$env/static/public' {
  */
 declare module '$env/dynamic/private' {
 	export const env: {
+		AUTH_TRUST_HOST: string;
+		AUTH_SECRET: string;
 		ALLUSERSPROFILE: string;
-		ANTIGRAVITY_CLI_ALIAS: string;
+		AMDRMPATH: string;
 		APPDATA: string;
 		ChocolateyInstall: string;
 		ChocolateyLastPathUpdate: string;
 		CHROME_CRASHPAD_PIPE_NAME: string;
-		cloudflared: string;
 		COLORTERM: string;
 		CommonProgramFiles: string;
 		CommonProgramW6432: string;
 		COMPUTERNAME: string;
 		ComSpec: string;
-		dd: string;
 		DriverData: string;
-		EFC_8036_1262719628: string;
-		EFC_8036_1592913036: string;
-		EFC_8036_2283032206: string;
-		EFC_8036_2775293581: string;
-		EFC_8036_3789132940: string;
+		EFC_10272_1262719628: string;
+		EFC_10272_1592913036: string;
+		EFC_10272_2283032206: string;
+		EFC_10272_3789132940: string;
 		FPS_BROWSER_APP_PROFILE_STRING: string;
 		FPS_BROWSER_USER_PROFILE_STRING: string;
 		GENARTS_LICENSE: string;
 		GIT_ASKPASS: string;
-		GOPATH: string;
+		GIT_PAGER: string;
+		GRADLE_HOME: string;
 		HOMEDRIVE: string;
 		HOMEPATH: string;
 		JAVA_HOME: string;
 		LANG: string;
 		LOCALAPPDATA: string;
 		LOGONSERVER: string;
-		MOZ_CRASHREPORTER_DATA_DIRECTORY: string;
-		MOZ_CRASHREPORTER_EVENTS_DIRECTORY: string;
-		MOZ_CRASHREPORTER_PING_DIRECTORY: string;
 		NODE: string;
 		NODE_ENV: string;
 		npm_command: string;
@@ -185,10 +179,8 @@ declare module '$env/dynamic/private' {
 		npm_package_name: string;
 		npm_package_version: string;
 		NUMBER_OF_PROCESSORS: string;
-		NVM_HOME: string;
-		NVM_SYMLINK: string;
 		OneDrive: string;
-		ORIGINAL_XDG_CURRENT_DESKTOP: string;
+		OneDriveConsumer: string;
 		OS: string;
 		Path: string;
 		PATHEXT: string;
@@ -203,6 +195,10 @@ declare module '$env/dynamic/private' {
 		PSModulePath: string;
 		PUBLIC: string;
 		PWD: string;
+		PyCharm: string;
+		PYENV: string;
+		PYTHONSTARTUP: string;
+		PYTHON_BASIC_REPL: string;
 		SESSIONNAME: string;
 		SystemDrive: string;
 		SystemRoot: string;
@@ -214,7 +210,6 @@ declare module '$env/dynamic/private' {
 		USERDOMAIN_ROAMINGPROFILE: string;
 		USERNAME: string;
 		USERPROFILE: string;
-		VBOX_MSI_INSTALL_PATH: string;
 		VSCODE_GIT_ASKPASS_EXTRA_ARGS: string;
 		VSCODE_GIT_ASKPASS_MAIN: string;
 		VSCODE_GIT_ASKPASS_NODE: string;
@@ -222,7 +217,6 @@ declare module '$env/dynamic/private' {
 		VSCODE_INJECTION: string;
 		VSCODE_PYTHON_AUTOACTIVATE_GUARD: string;
 		windir: string;
-		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}

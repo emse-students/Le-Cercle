@@ -409,19 +409,19 @@ export function updateBoisson(id: number, boisson: Partial<Boisson>) {
 }
 
 export function deleteBoisson(id: number) {
-    // Check dependencies...
-    // For now, if it's in a transaction or carte_perm, we might have issues.
-    // Ideally we should soft delete or block if used.
-    // Simple verification: if used in transactions, throw error.
-    const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "B" AND id_item = ?').get(id) as { count: number };
-    if (usedInTransactions.count > 0) {
-        throw new Error("Impossible de supprimer cette boisson car elle a déjà été vendue.");
-    }
-    
-    // Remove from carte_perm
-    db.prepare('DELETE FROM carte_perm WHERE type = "B" AND id_item = ?').run(id);
+	// Check dependencies...
+	// For now, if it's in a transaction or carte_perm, we might have issues.
+	// Ideally we should soft delete or block if used.
+	// Simple verification: if used in transactions, throw error.
+	const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "B" AND id_item = ?').get(id) as { count: number };
+	if (usedInTransactions.count > 0) {
+		throw new Error('Impossible de supprimer cette boisson car elle a déjà été vendue.');
+	}
 
-    return db.prepare('DELETE FROM boissons WHERE id = ?').run(id);
+	// Remove from carte_perm
+	db.prepare('DELETE FROM carte_perm WHERE type = "B" AND id_item = ?').run(id);
+
+	return db.prepare('DELETE FROM boissons WHERE id = ?').run(id);
 }
 
 // ========== CONSOMMABLES ==========
@@ -485,15 +485,15 @@ export function updateConsommable(id: number, consommable: Partial<Consommable>)
 }
 
 export function deleteConsommable(id: number) {
-     const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "C" AND id_item = ?').get(id) as { count: number };
-    if (usedInTransactions.count > 0) {
-        throw new Error("Impossible de supprimer ce consommable car il a déjà été vendu.");
-    }
+	const usedInTransactions = db.prepare('SELECT COUNT(*) as count FROM transactions WHERE type = "C" AND id_item = ?').get(id) as { count: number };
+	if (usedInTransactions.count > 0) {
+		throw new Error('Impossible de supprimer ce consommable car il a déjà été vendu.');
+	}
 
-    // Remove from carte_perm
-    db.prepare('DELETE FROM carte_perm WHERE type = "C" AND id_item = ?').run(id);
+	// Remove from carte_perm
+	db.prepare('DELETE FROM carte_perm WHERE type = "C" AND id_item = ?').run(id);
 
-    return db.prepare('DELETE FROM consommables WHERE id = ?').run(id);
+	return db.prepare('DELETE FROM consommables WHERE id = ?').run(id);
 }
 
 // ========== STATS & BILAN ==========
@@ -719,9 +719,9 @@ export function getPermCarteIds(idNomPerm: number) {
 }
 
 export function getMonthlyStats() {
-    // Group by month (YYYY-MM)
-    // We need to join with boissons/consommables to get purchase price for profit
-    return db.prepare(`
+	// Group by month (YYYY-MM)
+	// We need to join with boissons/consommables to get purchase price for profit
+	return db.prepare(`
         SELECT 
             strftime('%Y-%m', datetime(t.date, 'unixepoch')) as month,
             SUM(ABS(t.prix)) as total_global,

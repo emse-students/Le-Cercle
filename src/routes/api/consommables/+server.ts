@@ -28,6 +28,7 @@ export const POST: RequestHandler = async (event) => {
 		prix_vente,
 		prix_achat: 0,
 		stock: 0,
+		volume_ml: 0,
 		icone: 'Utensils'
 	});
 	return json({ success: true });

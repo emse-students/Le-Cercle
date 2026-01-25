@@ -306,7 +306,7 @@
 
 			<!-- Barmen -->
 			<div>
-				<label class="block text-sm font-bold text-text-muted mb-2">Barmen assignés</label>
+				<span class="block text-sm font-bold text-text-muted mb-2">Barmen assignés</span>
 				<div class="bg-bg-secondary border border-border rounded-xl p-4 space-y-3">
 					<UserSearch onSelect={addBarman} placeholder="Ajouter un barman..." />
 

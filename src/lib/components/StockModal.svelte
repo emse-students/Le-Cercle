@@ -104,11 +104,12 @@
 					</div>
 
 					<div>
-						<label class="block text-sm font-bold text-text-muted mb-2"
+						<label for="volume_restant" class="block text-sm font-bold text-text-muted mb-2"
 							>Volume restant (théorique : {perteTheorique.toFixed(1)}L)</label
 						>
 						<div class="relative">
 							<input
+								id="volume_restant"
 								type="number"
 								step="0.1"
 								bind:value={perteTheorique}
@@ -121,11 +122,12 @@
 					</div>
 
 					<div>
-						<label class="block text-sm font-bold text-text-muted mb-2"
+						<label for="new_capacity" class="block text-sm font-bold text-text-muted mb-2"
 							>Capacité du nouveau fût (mL)</label
 						>
 						<div class="relative">
 							<input
+								id="new_capacity"
 								type="number"
 								bind:value={nouveauVolume}
 								class="w-full px-4 py-3 rounded-xl bg-bg-secondary border border-border text-text-primary focus:outline-none focus:border-brand-red"
