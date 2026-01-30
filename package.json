@@ -82,6 +82,6 @@
 		"dotenv": "^17.2.3",
 		"lucide-svelte": "^0.562.0",
 		"svelte-adapter-bun": "^1.0.1",
-		"typescript-eslint": "^8.53.0"
+		"typescript-eslint": "^8.54.0"
 	}
 }
