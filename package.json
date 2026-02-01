@@ -36,7 +36,7 @@
 		"test": "vitest",
 		"test:unit": "vitest run",
 		"lint:md": "markdownlint -c .markdownlint.json '**/*.md' --ignore node_modules/**",
-		"prepare": "husky install"
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@faker-js/faker": "^10.2.0",
