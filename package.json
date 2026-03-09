@@ -78,7 +78,7 @@
 	"dependencies": {
 		"@auth/core": "^0.34.3",
 		"@auth/sveltekit": "^1.11.1",
-		"better-sqlite3": "^12.6.0",
+		"better-sqlite3": "^12.6.2",
 		"dotenv": "^17.2.3",
 		"lucide-svelte": "^0.562.0",
 		"svelte-adapter-bun": "^1.0.1",
