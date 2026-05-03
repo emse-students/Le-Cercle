@@ -4,9 +4,7 @@
 
 -- Utilisateurs
 CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    login TEXT NOT NULL UNIQUE,
-    mail TEXT NOT NULL DEFAULT '',
+    uuid TEXT PRIMARY KEY,
     prenom TEXT NOT NULL,
     nom TEXT NOT NULL,
     promo INTEGER NOT NULL,
@@ -75,7 +73,7 @@ CREATE TABLE IF NOT EXISTS noms_perms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nom TEXT NOT NULL,
     annee TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 1
+    est_active INTEGER NOT NULL DEFAULT 1
 );
 
 -- Permanences
@@ -85,7 +83,7 @@ CREATE TABLE IF NOT EXISTS perms (
     date INTEGER NOT NULL,
     total_vente REAL NOT NULL DEFAULT 0.0,
     total_litre REAL NOT NULL DEFAULT 0.0,
-    is_open INTEGER NOT NULL DEFAULT 0,
+    est_ouverte INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(id_nom_perm) REFERENCES noms_perms(id) ON DELETE CASCADE
 );
 
@@ -93,10 +91,10 @@ CREATE TABLE IF NOT EXISTS perms (
 CREATE TABLE IF NOT EXISTS perm_barmans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_perm INTEGER NOT NULL,
-    id_user TEXT NOT NULL,
+    uuid_user TEXT NOT NULL,
     FOREIGN KEY(id_perm) REFERENCES perms(id) ON DELETE CASCADE,
-    FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE(id_perm, id_user)
+    FOREIGN KEY(uuid_user) REFERENCES users(uuid) ON DELETE CASCADE,
+    UNIQUE(id_perm, uuid_user)
 );
 
 -- Carte personnalisée par permanence
@@ -112,16 +110,16 @@ CREATE TABLE IF NOT EXISTS carte_perm (
 -- Transactions
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_user TEXT NOT NULL,
-    id_debiteur TEXT NOT NULL,
+    uuid_user TEXT NOT NULL,
+    uuid_debiteur TEXT NOT NULL,
     id_perm INTEGER,
     type TEXT NOT NULL CHECK(type IN ('B', 'C', 'R', 'T')),
     id_item INTEGER,
     date INTEGER NOT NULL,
     nb INTEGER NOT NULL DEFAULT 1,
     prix REAL NOT NULL,
-    FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY(id_debiteur) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(uuid_user) REFERENCES users(uuid) ON DELETE CASCADE,
+    FOREIGN KEY(uuid_debiteur) REFERENCES users(uuid) ON DELETE CASCADE,
     FOREIGN KEY(id_perm) REFERENCES perms(id) ON DELETE SET NULL
 );
 
@@ -138,8 +136,46 @@ CREATE TABLE IF NOT EXISTS year_stats (
 );
 
 -- Index de performance
-CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(id_user);
+CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(uuid_user);
 CREATE INDEX IF NOT EXISTS idx_transactions_perm ON transactions(id_perm);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-CREATE INDEX IF NOT EXISTS idx_perm_barmans_user ON perm_barmans(id_user);
+CREATE INDEX IF NOT EXISTS idx_perm_barmans_user ON perm_barmans(uuid_user);
 CREATE INDEX IF NOT EXISTS idx_perm_barmans_perm ON perm_barmans(id_perm);
+
+
+-- ============================== --
+-- Schéma pour les matchs en perm --
+-- ============================== --
+
+CREATE TABLE IF NOT EXISTS equipes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL UNIQUE,
+    uuid_joueur1 TEXT NOT NULL,
+    uuid_joueur2 TEXT NOT NULL,
+    is_ephemere INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS matchmaking_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_equipe INTEGER NOT NULL UNIQUE,
+    statut TEXT NOT NULL DEFAULT 'en_attente' CHECK(statut IN ('en_attente', 'en_match', 'annule')),
+    date_inscription INTEGER NOT NULL,
+    FOREIGN KEY(id_equipe) REFERENCES equipes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS matchs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_equipe1 INTEGER NOT NULL,
+    id_equipe2 INTEGER NOT NULL,
+    id_equipe_gagnante INTEGER, -- NULL tant que le match n'est pas terminé
+    statut TEXT NOT NULL DEFAULT 'en_cours' CHECK(statut IN ('en_cours', 'termine', 'annule')),
+    id_perm INTEGER,                     -- optionnel : rattacher à une perm
+    date_debut INTEGER NOT NULL,
+    date_fin INTEGER, -- NULL tant que pas terminé
+    FOREIGN KEY(id_equipe1) REFERENCES equipes(id),
+    FOREIGN KEY(id_equipe2) REFERENCES equipes(id),
+    FOREIGN KEY(id_equipe_gagnante) REFERENCES equipes(id),
+    FOREIGN KEY(id_perm) REFERENCES perms(id) ON DELETE SET NULL,
+    CHECK(id_equipe1 != id_equipe2)
+);

@@ -1,8 +1,6 @@
 import { env } from '$env/dynamic/private';
-import { getUserById, createUser, updateUser } from '$lib/db/users';
-import type { DBUser } from '$lib/db/users';
-
-const SYSTEM_USER_ID = 'dd68bb5b4f7c56878a1bd873593a3e7c3434242c80871e4ead9fe99d3f48a782';
+import { getUserByUUID, createUser, updateUser } from '$lib/db/user';
+import type { DBUser } from '$lib/db/types';
 
 interface OIDCToken {
 	access_token: string;
@@ -225,14 +223,13 @@ function handleUserInDatabase(
 	customClaims: Record<string, unknown>
 ): DBUser | null {
 	try {
-		const userId = getProfileSub(profile);
-		if (!userId) {
+		const uuid = getProfileSub(profile);
+		if (!uuid) {
 			console.error('[AUTH] No sub in profile');
 			return null;
 		}
 
-		const existingUser = getUserById(userId);
-		const isAdmin = userId === SYSTEM_USER_ID;
+		const existingUser = getUserByUUID(uuid);
 
 		// Extract all available data
 		const firstName =
@@ -251,15 +248,9 @@ function handleUserInDatabase(
 
 		const rawPromo = getProfilePromo(profile, customClaims);
 		const promo = parsePromo(rawPromo);
-		const formation =
-			typeof profile.formation === 'string'
-				? profile.formation.trim()
-				: typeof customClaims.formation === 'string'
-					? (customClaims.formation as string).trim()
-					: null;
 
 		console.warn(
-			`[AUTH] Login: ${userId} — OIDC: promo=${JSON.stringify(rawPromo)} (parsed:${promo ?? 'null'}), formation=${JSON.stringify(profile.formation ?? customClaims.formation ?? null)}`
+			`[AUTH] Login: ${uuid} — OIDC: promo=${JSON.stringify(rawPromo)} (parsed:${promo ?? 'null'}), formation=${JSON.stringify(profile.formation ?? customClaims.formation ?? null)}`
 		);
 		if (existingUser) {
 			console.warn(
@@ -269,50 +260,42 @@ function handleUserInDatabase(
 			console.warn('[AUTH] DB actuelle: aucun utilisateur trouvé → création');
 		}
 
-		const userData: DBUser = {
-			id_user: userId,
-			name: computeName(profile, userId),
-			first_name: firstName,
-			last_name: lastName,
-			role: isAdmin ? 'cercleux' : 'user',
-			promo,
-		};
-
 		if (!existingUser) {
-			createUser(userData);
+			const newUser: DBUser = {
+				uuid: uuid,
+				prenom: firstName as string || '?',
+				nom: lastName as string || '?',
+				promo: promo || 0,
+				solde: 0.0,
+				role: 'user',
+				statut_cotisation: 'non_cotisant',
+			};
+			createUser(newUser);
 			console.warn(
-				`[AUTH] Nouvel utilisateur: ${userData.name} (promo:${userData.promo ?? '?'})`
+				`[AUTH] Nouvel utilisateur: ${newUser.prenom} (promo:${newUser.promo ?? '?'})`
 			);
 		} else {
 			// Toujours écraser avec les données SSO à chaque connexion.
 			// On ne passe que les champs non-null pour ne pas effacer les valeurs
 			// manuelles quand le SSO ne fournit pas le champ (ex: promo pour le personnel).
-			const updatePayload: Partial<DBUser> & { id_user: string } = {
-				id_user: userId,
-				name: userData.name
+			const updatePayload: Partial<DBUser>  = {
+				prenom: firstName as string,
+				nom: lastName as string,
 			};
-			if (firstName !== null) {
-				updatePayload.first_name = firstName;
-			}
-			if (lastName !== null) {
-				updatePayload.last_name = lastName;
-			}
-			if (promo !== null) {
-				updatePayload.promo = promo;
-			}
+
 
 			console.warn(`[AUTH] updatePayload: ${JSON.stringify(updatePayload)}`);
-			updateUser(updatePayload);
+			updateUser(uuid, updatePayload);
 			console.warn(
 				`[AUTH] Après update: promo=${promo !== null ? promo : '(non écrasé, SSO null)'}`
 			);
 		}
 
 		// Re-fetcher depuis la DB pour avoir l'état réel (role mitviste, photos_id, etc.)
-		const freshUser = getUserById(userId);
+		const freshUser = getUserByUUID(uuid);
 		if (!freshUser) {
 			console.error('[AUTH] Could not re-fetch user after create/update');
-			return userData;
+			return null;
 		}
 		return freshUser;
 	} catch (e) {
@@ -376,33 +359,4 @@ export function generateAuthorizationUrl(
 
 	const authUrl = `${getIssuerBaseUrl()}/authorize/?${params.toString()}`;
 	return authUrl;
-}
-
-/**
- * Export session user data type
- */
-export interface SessionUser {
-	id: string;
-	name: string;
-	first_name?: string | null;
-	last_name?: string | null;
-	role: string;
-	promo?: number | null;
-	formation?: string | null;
-}
-
-/**
- * Convert DBUser to SessionUser
- */
-export function toSessionUser(dbUser: any): SessionUser {
-	const sessionUser: SessionUser = {
-		id: dbUser.id,
-		name: dbUser.login,
-		first_name: dbUser.prenom,
-		last_name: dbUser.nom,
-		role: dbUser.role,
-		promo: dbUser.promo,
-	};
-
-	return sessionUser;
 }

@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
 import type { Cookies } from '@sveltejs/kit';
-import { getUserById } from '$lib/db/users';
-import { toSessionUser, type SessionUser } from '$lib/auth';
+import { getUserByUUID } from '$lib/db/user';
+import type { DBUser } from '$lib/db/types';
 
 const SESSION_COOKIE_NAME = '__session_user';
 const MAX_AGE = 365 * 24 * 60 * 60; // 1 year
@@ -29,7 +29,7 @@ export function clearSessionCookie(cookies: Cookies): void {
 /**
  * Get current session user from cookie
  */
-export function getSessionUser(cookies: Cookies): SessionUser | null {
+export function getUser(cookies: Cookies): DBUser | null {
 	const userId = cookies.get(SESSION_COOKIE_NAME);
 
 	if (!userId) {
@@ -37,12 +37,8 @@ export function getSessionUser(cookies: Cookies): SessionUser | null {
 	}
 	
 	try {
-		const dbUser = getUserById(userId);
-		if (!dbUser) {
-			return null;
-		}
-		const sessionUser = toSessionUser(dbUser);
-		return sessionUser;
+		const dbUser = getUserByUUID(userId);
+		return dbUser;
 	} catch (e) {
 		console.error('[SESSION] Error retrieving user:', e);
 		return null;
