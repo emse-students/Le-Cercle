@@ -1,4 +1,4 @@
-import db from './index';
+import { db } from "$lib/db/database";
 import type { User, Transaction, Boisson, Consommable, Perm, Contenu, Contenant } from '$lib/types';
 
 // ========== USERS ==========
@@ -39,9 +39,9 @@ export function updateUserStatutCotisation(userId: number, statut: string) {
 
 export function deleteUser(userId: number) {
 	// Supprimer les dépendances pour éviter les erreurs de clé étrangère
-	db.prepare('DELETE FROM perm_barmans WHERE id_user = ?').run(userId);
-	db.prepare('DELETE FROM transactions WHERE id_user = ? OR id_debiteur = ?').run(userId, userId);
-	db.prepare('DELETE FROM year_stats WHERE id_user = ?').run(userId);
+	db.prepare('DELETE FROM perm_barmans WHERE id = ?').run(userId);
+	db.prepare('DELETE FROM transactions WHERE id = ? OR id_debiteur = ?').run(userId, userId);
+	db.prepare('DELETE FROM year_stats WHERE id = ?').run(userId);
 
 	return db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 }
@@ -72,7 +72,7 @@ export function rechargeBalance(userId: number, amount: number) {
 
 	// Transaction de recharge (Type R = Recharge, id_perm NULL)
 	const stmt = db.prepare(`
-        INSERT INTO transactions (id_user, id_debiteur, id_perm, type, id_item, date, nb, prix)
+        INSERT INTO transactions (id, id_debiteur, id_perm, type, id_item, date, nb, prix)
         VALUES (?, ?, NULL, 'R', NULL, ?, 1, ?)
     `);
 
@@ -85,17 +85,17 @@ export function rechargeBalance(userId: number, amount: number) {
 // ========== PERM BARMANS ==========
 
 export function addBarmanToPerm(permId: number, userId: number) {
-	return db.prepare('INSERT INTO perm_barmans (id_perm, id_user) VALUES (?, ?)').run(permId, userId);
+	return db.prepare('INSERT INTO perm_barmans (id_perm, id) VALUES (?, ?)').run(permId, userId);
 }
 
 export function removeBarmanFromPerm(permId: number, userId: number) {
-	return db.prepare('DELETE FROM perm_barmans WHERE id_perm = ? AND id_user = ?').run(permId, userId);
+	return db.prepare('DELETE FROM perm_barmans WHERE id_perm = ? AND id = ?').run(permId, userId);
 }
 
 export function getPermBarmans(permId: number): User[] {
 	return db.prepare(`
         SELECT u.* FROM users u
-        JOIN perm_barmans pb ON u.id = pb.id_user
+        JOIN perm_barmans pb ON u.id = pb.id
         WHERE pb.id_perm = ?
     `).all(permId) as User[];
 }
@@ -113,12 +113,12 @@ export function getUserTransactions(userId: number, limit = 50): Transaction[] {
             -- Consommable info
             con.nom as consommable_nom
         FROM transactions t
-        JOIN users u ON t.id_user = u.id
+        JOIN users u ON t.id = u.id
         LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
         LEFT JOIN contenus co ON b.id_contenu = co.id
         LEFT JOIN contenants ct ON b.id_contenant = ct.id
         LEFT JOIN consommables con ON t.type = 'C' AND t.id_item = con.id
-        WHERE t.id_user = ?
+        WHERE t.id = ?
         ORDER BY t.date DESC
         LIMIT ?
     `).all(userId, limit) as Transaction[];
@@ -149,7 +149,7 @@ export function getPermTransactions(permId: number): Transaction[] {
             -- Consommable info
             con.nom as consommable_nom, con.prix_achat as consommable_prix_achat, con.icone as consommable_icone, con.volume_ml as consommable_volume
         FROM transactions t
-        JOIN users u ON t.id_user = u.id
+        JOIN users u ON t.id = u.id
         LEFT JOIN boissons b ON t.type = 'B' AND t.id_item = b.id
         LEFT JOIN contenus co ON b.id_contenu = co.id
         LEFT JOIN contenants ct ON b.id_contenant = ct.id
@@ -161,7 +161,7 @@ export function getPermTransactions(permId: number): Transaction[] {
 
 export function createTransaction(transaction: Omit<Transaction, 'id'>) {
 	const stmt = db.prepare(`
-        INSERT INTO transactions (id_user, id_debiteur, id_perm, type, id_item, date, nb, prix)
+        INSERT INTO transactions (id, id_debiteur, id_perm, type, id_item, date, nb, prix)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 	const result = stmt.run(
@@ -212,7 +212,7 @@ export function getTransactionsByDateRange(startDate: number, endDate: number, l
             u.prenom as user_prenom, u.nom as user_nom,
             d.prenom as debiteur_prenom, d.nom as debiteur_nom
         FROM transactions t
-        LEFT JOIN users u ON t.id_user = u.id
+        LEFT JOIN users u ON t.id = u.id
         LEFT JOIN users d ON t.id_debiteur = d.id
         WHERE t.date BETWEEN ? AND ?
         ORDER BY t.date DESC
@@ -579,7 +579,7 @@ export function getUserStats(userId: number) {
             COUNT(*) as nb_transactions,
             COUNT(DISTINCT id_perm) as nb_perms
         FROM transactions
-        WHERE id_user = ? AND type IN ('B', 'C')
+        WHERE id = ? AND type IN ('B', 'C')
     `).get(userId);
 }
 
@@ -597,7 +597,7 @@ export function getGlobalStats() {
 // ========== PERMS MANAGEMENT ==========
 
 export function isUserInPerm(userId: number, permId: number): boolean {
-	const permBarman = db.prepare('SELECT id FROM perm_barmans WHERE id_user = ? AND id_perm = ?').get(userId, permId);
+	const permBarman = db.prepare('SELECT id FROM perm_barmans WHERE id = ? AND id_perm = ?').get(userId, permId);
 	return !!permBarman;
 }
 
@@ -618,7 +618,7 @@ export function getActivePermForUser(userId: number): Perm | undefined {
         FROM perms p
         JOIN noms_perms np ON p.id_nom_perm = np.id
         JOIN perm_barmans pb ON pb.id_perm = p.id
-        WHERE pb.id_user = ? AND np.is_active = 1
+        WHERE pb.id = ? AND np.is_active = 1
         ORDER BY p.date DESC
         LIMIT 1
     `).get(userId) as Perm | undefined;
@@ -649,18 +649,18 @@ export function closePerm(permId: number) {
 }
 
 export function assignUserToPerm(userId: number, permId: number) {
-	return db.prepare('INSERT OR IGNORE INTO perm_barmans (id_user, id_perm) VALUES (?, ?)').run(userId, permId);
+	return db.prepare('INSERT OR IGNORE INTO perm_barmans (id, id_perm) VALUES (?, ?)').run(userId, permId);
 }
 
 export function removeUserFromPerm(userId: number, permId: number) {
-	return db.prepare('DELETE FROM perm_barmans WHERE id_user = ? AND id_perm = ?').run(userId, permId);
+	return db.prepare('DELETE FROM perm_barmans WHERE id = ? AND id_perm = ?').run(userId, permId);
 }
 
 export function getPermMembers(permId: number): User[] {
 	return db.prepare(`
         SELECT u.*
         FROM users u
-        JOIN perm_barmans pb ON u.id = pb.id_user
+        JOIN perm_barmans pb ON u.id = pb.id
         WHERE pb.id_perm = ?
     `).all(permId) as User[];
 }

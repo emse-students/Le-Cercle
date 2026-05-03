@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
+import { randomUUID } from 'crypto'
 import { fakerFR as faker } from '@faker-js/faker';
 import { readFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
@@ -58,8 +59,8 @@ console.log('👤 Creating users...');
 // 2. Add System Admin (already handled by seed.sql but ensured here)
 try {
     const adminSys = db.prepare(`
-        INSERT OR IGNORE INTO users (login, nom, prenom, role, promo, solde, statut_cotisation, mail)
-        VALUES ('admin', 'System', 'Admin', 'cercleux', '2025', 100.00, 'cotisant_avec_alcool', 'admin@emse.fr')
+        INSERT OR IGNORE INTO users (id, login, nom, prenom, role, promo, solde, statut_cotisation, mail)
+        VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'System', 'Admin', 'cercleux', 2025, 100.00, 'cotisant_avec_alcool', 'admin@emse.fr')
     `).run();
     if (adminSys.changes > 0) users.push({ id: adminSys.lastInsertRowid, role: 'cercleux', login: 'admin' });
 } catch (e) { }
@@ -78,20 +79,22 @@ for (let i = 0; i < 50; i++) {
     const existing = db.prepare('SELECT id FROM users WHERE login = ?').get(login);
     if (existing) continue;
 
+    const UUID = randomUUID().toString();
     const info = db.prepare(`
-        INSERT INTO users (login, nom, prenom, role, promo, solde, statut_cotisation, mail)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (id, login, nom, prenom, role, promo, solde, statut_cotisation, mail)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
+        UUID,
         login,
         lastName,
         firstName,
         role,
-        '20' + faker.number.int({ min: 20, max: 27 }),
+        2000 + faker.number.int({ min: 20, max: 27 }),
         faker.number.float({ min: -10, max: 50, fractionDigits: 2 }),
         faker.helpers.arrayElement(['non_cotisant', 'cotisant_sans_alcool', 'cotisant_avec_alcool']),
         faker.internet.email({ firstName, lastName })
     );
-    users.push({ id: info.lastInsertRowid, role, login });
+    users.push({ id: UUID, role, login });
 }
 
 // --- ITEMS (Boissons & Consommables) ---

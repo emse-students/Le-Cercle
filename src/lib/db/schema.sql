@@ -4,7 +4,7 @@
 
 -- Utilisateurs
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,
     login TEXT NOT NULL UNIQUE,
     mail TEXT NOT NULL DEFAULT '',
     prenom TEXT NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS perms (
 CREATE TABLE IF NOT EXISTS perm_barmans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_perm INTEGER NOT NULL,
-    id_user INTEGER NOT NULL,
+    id_user TEXT NOT NULL,
     FOREIGN KEY(id_perm) REFERENCES perms(id) ON DELETE CASCADE,
     FOREIGN KEY(id_user) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(id_perm, id_user)
@@ -112,8 +112,8 @@ CREATE TABLE IF NOT EXISTS carte_perm (
 -- Transactions
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_user INTEGER NOT NULL,
-    id_debiteur INTEGER NOT NULL,
+    id_user TEXT NOT NULL,
+    id_debiteur TEXT NOT NULL,
     id_perm INTEGER,
     type TEXT NOT NULL CHECK(type IN ('B', 'C', 'R', 'T')),
     id_item INTEGER,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 -- Statistiques annuelles
 CREATE TABLE IF NOT EXISTS year_stats (
-    id_user INTEGER NOT NULL,
+    id_user TEXT NOT NULL,
     annee INTEGER NOT NULL,
     depense REAL NOT NULL DEFAULT 0.0,
     volume REAL NOT NULL DEFAULT 0.0,

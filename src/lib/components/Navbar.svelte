@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { signIn, signOut } from '@auth/sveltekit/client';
 	import { page } from '$app/stores'; // Using stores for Svelte 4/5 compatibility if state not ready, but user has Svelte 5.
 	// However, MiGallery used $app/state everywhere? No, MiGallery used page from $app/state in snippets I saw?
 	// Let's stick to $page store for safety or $state logic if I'm sure.
@@ -49,14 +48,16 @@
 
 	<div class="user">
 		{#if u}
-			<span class="user-name">{u.firstname} {u.lastname}</span>
-			<button class="btn-logout" onclick={() => signOut()} aria-label="Déconnexion">
-				<LogOut size={18} />
-			</button>
+			<span class="user-name">{u.prenom} {u.nom}</span>
+			<form action="/auth/logout" method="POST">
+			    <button type="submit" class="btn-logout" aria-label="Déconnexion">
+			        <LogOut size={18} />
+			    </button>
+			</form>
 		{:else}
-			<button class="btn-login" onclick={() => signIn('cas-emse')} aria-label="Connexion">
-				<LogIn size={18} /> Connexion
-			</button>
+			<a href="/auth/login" class="btn-login" aria-label="Connexion">
+                <LogIn size={18} /> Connexion
+            </a>
 		{/if}
 	</div>
 </nav>
