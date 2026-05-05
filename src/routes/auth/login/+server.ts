@@ -23,7 +23,7 @@ export const GET: RequestHandler = ({ cookies, url }) => {
 			path: '/',
 			maxAge: 600, // 10 minutes
 			sameSite: 'lax',
-			secure: true,
+			secure: false, // TODO: set to true when we have HTTPS
 			httpOnly: true
 		});
 
@@ -31,7 +31,7 @@ export const GET: RequestHandler = ({ cookies, url }) => {
 			path: '/',
 			maxAge: 600,
 			sameSite: 'lax',
-			secure: true,
+			secure: false, // TODO: set to true when we have HTTPS
 			httpOnly: true
 		});
 

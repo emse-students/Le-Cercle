@@ -41,7 +41,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-20 transition-all duration-1000 delay-300 transform {isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}">
       
       <!-- Menu Card -->
-      <a href="/serve" class="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-500 hover:bg-white/10 hover:border-amber-500/50 hover:-translate-y-2">
+      <a href="/" class="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-500 hover:bg-white/10 hover:border-amber-500/50 hover:-translate-y-2">
         <div class="absolute top-0 right-0 -mr-8 -mt-8 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl group-hover:bg-amber-500/20 transition-colors"></div>
         
         <div class="flex flex-col h-full justify-between">
@@ -59,7 +59,7 @@
       </a>
 
       <!-- Account Card -->
-      <a href="/profile" class="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-500 hover:bg-white/10 hover:border-rose-500/50 hover:-translate-y-2">
+      <a href="/" class="group relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 transition-all duration-500 hover:bg-white/10 hover:border-rose-500/50 hover:-translate-y-2">
         <div class="absolute top-0 right-0 -mr-8 -mt-8 w-40 h-40 bg-rose-500/10 rounded-full blur-3xl group-hover:bg-rose-500/20 transition-colors"></div>
         
         <div class="flex flex-col h-full justify-between">

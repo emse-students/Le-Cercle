@@ -25,7 +25,7 @@ export function isInMatch(id_equipe: number): boolean {
     return !!query.get({$id_equipe: id_equipe});
 }
 
-export function joinMatchmaking(id_equipe: number): void {
+export function joinMatchmaking(id_equipe: number, no_update_uuid?: string): void {
     // 1. Vérifier si l'équipe est déjà en file ou en match actif
     if (isInMatchmaking(id_equipe) || isInMatch(id_equipe)) {
         throw new Error("L'équipe est déjà occupée (en file ou en match).");
@@ -49,7 +49,7 @@ export function joinMatchmaking(id_equipe: number): void {
 /**
  * Retire une équipe de la file d'attente (Annulation)
  */
-export function leaveMatchmaking(id_equipe: number): void {
+export function leaveMatchmaking(id_equipe: number, no_update_uuid?: string): void {
     db.query(`
         UPDATE matchmaking_queue 
         SET statut = 'annule' 
@@ -69,7 +69,7 @@ export function getMatch(id_equipe: number): DBMatch | null {
  * Tente de créer un match entre les deux équipes les plus anciennes en file
  * Utilise une transaction pour garantir l'atomicité
  */
-export function tryStartMatch(id_perm: number | null = null): number | null {
+export function tryStartMatch(id_perm: number | null = null, no_update_uuid?: string): number | null {
     const transaction = db.transaction(() => {
         // 1. Récupérer les deux plus anciennes équipes en attente
         const candidates = db.prepare(`
@@ -94,16 +94,16 @@ export function tryStartMatch(id_perm: number | null = null): number | null {
             RETURNING id
         `).get(id1, id2, id_perm, Date.now()) as { id: number };
 
-        return result.id;
+        return result;
     });
 
-    return transaction();
+    return transaction()?.id || null;
 }
 
 /**
  * Termine un match et désigne un vainqueur
  */
-export function endMatch(id_match: number, id_vainqueur: number): void {
+export function endMatch(id_match: number, id_vainqueur: number, no_update_uuid?: string): void {
     const match = db.prepare(`SELECT id_equipe1, id_equipe2 FROM matchs WHERE id = ?`).get(id_match) as any;
 
     if (!match) throw new Error("Match introuvable.");

@@ -14,11 +14,28 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw fail(500, {error: "Tu n'as pas d'équipe"});
 	}
 
+	const query2 = db.query(`
+		SELECT
+			t1.nom AS nom_equipe1,
+			t2.nom AS nom_equipe2,
+			CASE
+				WHEN m.id_equipe_gagnante = $mon_equipe THEN TRUE 
+				ELSE FALSE
+			END AS victoire
+		FROM matchs m
+		JOIN equipes t1 ON m.id_equipe1 = t1.id
+		JOIN equipes t2 ON m.id_equipe2 = t2.id
+		WHERE (m.id_equipe1 = $mon_equipe OR m.id_equipe2 = $mon_equipe)
+	`);
+
+	const histo = query2.all({$mon_equipe: equipe.id});
+
 	const match = getMatch(equipe.id);
 	if (!match) {
 		return {
 			equipe: equipe,
 			match: null,
+			historique: histo,
 			matchmaking: isInMatchmaking(equipe.id),
 		}
 	}
@@ -42,26 +59,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 	`);
 
 	const noms = query.get({ $match_id: match.id });
-	
-	const query2 = db.query(`
-		SELECT
-			t1.nom AS nom_equipe1,
-			t2.nom AS nom_equipe2,
-			CASE
-				WHEN m.id_equipe_gagnante = $mon_equipe THEN TRUE 
-				ELSE FALSE
-			END AS victoire
-		FROM matchs m
-		JOIN equipes t1 ON m.id_equipe1 = t1.id
-		JOIN equipes t2 ON m.id_equipe2 = t2.id
-		WHERE (m.id_equipe1 = $mon_equipe OR m.id_equipe2 = $mon_equipe)
-	`);
 
 	return {
 		equipe: equipe,
 		match: match,
 		noms: noms,
-		historique: query2.all({$mon_equipe: equipe.id}),
+		historique: histo,
 		matchmaking: isInMatchmaking(equipe.id),
 	};
 };
@@ -76,7 +79,7 @@ export const actions: Actions = {
 		if (!id_equipe) return fail(400, { error: 'Équipe manquante' });
 
 		try {
-			const result = joinMatchmaking(id_equipe);
+			const result = joinMatchmaking(id_equipe, user.uuid);
 			
 			tryStartMatch();
 
@@ -95,7 +98,7 @@ export const actions: Actions = {
 		if (!id_equipe) return fail(400, { error: 'Équipe manquante' });
 
 		try {
-			leaveMatchmaking(id_equipe);
+			leaveMatchmaking(id_equipe, user.uuid);
 			return { success: true };
 		} catch (e: any) {
 			return fail(400, { error: e.message });
@@ -111,7 +114,7 @@ export const actions: Actions = {
 		if (!id_match || !id_equipe_gagnante) return fail(400, { error: 'Paramètres manquants' });
 
 		try {
-			endMatch(id_match, id_equipe_gagnante);
+			endMatch(id_match, id_equipe_gagnante, user.uuid);
 			return { success: true };
 		} catch (e: any) {
 			return fail(400, { error: e.message });
@@ -126,7 +129,7 @@ export const actions: Actions = {
 		if (!id_match) return fail(400, { error: 'Match manquant' });
 
 		try {
-			endMatch(id_match, 0);
+			endMatch(id_match, 0, user.uuid);
 			return { success: true };
 		} catch (e: any) {
 			return fail(400, { error: e.message });
